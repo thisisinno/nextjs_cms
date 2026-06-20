@@ -1,3 +1,11 @@
-export function Loader({ label = 'Loading site' }: { label?: string }) {
-  return <div className="grid min-h-[45vh] place-items-center" role="status" aria-live="polite"><div className="text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-gold border-t-transparent" /><p className="mt-4 text-sm font-black tracking-[.2em] text-ink">{label}</p></div></div>;
+'use client';
+
+export function Loader({ label = 'Preparing your experience', fullScreen = true }: { label?: string; fullScreen?: boolean }) {
+  return <main className={`premium-loader ${fullScreen ? 'min-h-screen' : 'min-h-[360px]'}`} role="status" aria-live="polite">
+    <div className="loader-glass">
+      <div className="loader-orb"><i /><i /><i /></div>
+      <p className="mt-5 text-sm font-black tracking-[.24em] text-white">SCCL<span className="text-gold">.</span></p>
+      <p className="mt-2 text-sm text-slate-300">{label}</p>
+    </div>
+  </main>;
 }
