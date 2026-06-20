@@ -1,2 +1,31 @@
-'use client'; import {createContext,useContext,useEffect,useState} from 'react'; import type {CartItem,Service} from '@/lib/types';
-const C=createContext<any>(null); export function CartProvider({children}:{children:React.ReactNode}){const [items,setItems]=useState<CartItem[]>([]);useEffect(()=>setItems(JSON.parse(localStorage.getItem('enquiry-cart')||'[]')),[]);useEffect(()=>localStorage.setItem('enquiry-cart',JSON.stringify(items)),[items]);const add=(s:Service)=>setItems((x:CartItem[])=>x.some(i=>i.service===s.id)?x:[...x,{service:s.id,service_title_snapshot:s.title,note:'',quantity:1}]);return <C.Provider value={{items,add,setItems}}>{children}</C.Provider>} export const useCart=()=>useContext(C);
+'use client';
+
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import type { CartItem, Service } from '@/lib/types';
+
+type CartContext = { items: CartItem[]; add: (service: Service) => void; remove: (service: number) => void; updateNote: (service: number, note: string) => void; clear: () => void; ready: boolean };
+const Cart = createContext<CartContext | null>(null);
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    try { setItems(JSON.parse(localStorage.getItem('enquiry-cart') || '[]')); } catch { localStorage.removeItem('enquiry-cart'); }
+    setReady(true);
+  }, []);
+  useEffect(() => { if (ready) localStorage.setItem('enquiry-cart', JSON.stringify(items)); }, [items, ready]);
+  const value = useMemo(() => ({
+    items, ready,
+    add: (service: Service) => setItems(current => current.some(item => item.service === service.id) ? current : [...current, { service: service.id, service_title_snapshot: service.title, note: '', quantity: 1 }]),
+    remove: (service: number) => setItems(current => current.filter(item => item.service !== service)),
+    updateNote: (service: number, note: string) => setItems(current => current.map(item => item.service === service ? { ...item, note } : item)),
+    clear: () => setItems([]),
+  }), [items, ready]);
+  return <Cart.Provider value={value}>{children}</Cart.Provider>;
+}
+
+export function useCart() {
+  const cart = useContext(Cart);
+  if (!cart) throw new Error('useCart must be used within CartProvider');
+  return cart;
+}

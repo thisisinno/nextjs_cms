@@ -1,0 +1,3 @@
+export function AdminRows({ rows }: { rows: any[] }) {
+  return <div className="mt-4 overflow-x-auto rounded-xl bg-white"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-3">Visitor</th><th className="p-3">Phone</th><th className="p-3">Status</th><th className="p-3">Services</th></tr></thead><tbody>{rows?.map(row => <tr className="border-b" key={row.id}><td className="p-3 font-semibold">{row.full_name}</td><td className="p-3">{row.phone}</td><td className="p-3 capitalize">{row.status}</td><td className="p-3">{row.items?.map((item: any) => item.service_title_snapshot).join(', ')}</td></tr>)}</tbody></table></div>;
+}
