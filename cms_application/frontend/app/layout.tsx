@@ -1,0 +1,1 @@
+import './globals.css'; import {CartProvider} from '@/components/cart'; import {Header} from '@/components/site'; export const metadata={title:'Atlas Construct | Engineering & Construction',description:'Premium construction and consultancy services.'}; export default function Layout({children}:{children:React.ReactNode}){return <CartProvider><Header/>{children}</CartProvider>}
