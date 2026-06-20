@@ -1,4 +1,5 @@
-export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://demo.schoolsoft.online/api').replace(/\/$/, '');
+const configuredApiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://demo.schoolsoft.online').replace(/\/+$/, '');
+export const API_BASE = configuredApiBase.endsWith('/api') ? configuredApiBase : `${configuredApiBase}/api`;
 
 export function apiUrl(path: string) {
   return `${API_BASE}/${path.replace(/^\//, '')}`;
@@ -25,7 +26,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(url, { ...init, headers, mode: 'cors' });
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') console.error('API network error:', url, error);
+    console.error('API network error:', url, error);
     throw new Error(`Cannot connect to the backend. Check CORS, HTTPS, and whether ${API_BASE} is online.`);
   }
   const text = await response.text();
@@ -37,8 +38,11 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (!response.ok) {
     const data = body as { detail?: string; non_field_errors?: string[] } | null;
-    const detail = data?.detail || data?.non_field_errors?.join(' ') || (data && typeof data === 'object' ? Object.values(data).flat().join(' ') : '') || `Request failed (${response.status})`;
-    throw new Error(detail);
+    const detail = data && typeof data === 'object'
+      ? data.detail || data.non_field_errors?.join(' ') || Object.values(data).flat().filter(value => typeof value === 'string').join(' ')
+      : '';
+    const message = detail || `Request failed with status ${response.status}`;
+    throw new Error(message);
   }
   return response.status === 204 ? (undefined as T) : body as T;
 }
