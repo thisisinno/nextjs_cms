@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import serializers
 from .models import *
 
@@ -10,6 +12,30 @@ class SiteSettingSerializer(ImageValidationMixin, serializers.ModelSerializer):
 class HeroSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=HeroSection; fields='__all__'
 class AboutSerializer(ImageValidationMixin, serializers.ModelSerializer):
+    bullet_points = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True,
+    )
+
+    def to_internal_value(self, data):
+        mutable = data.copy()
+        raw = mutable.get('bullet_points')
+        if isinstance(raw, str):
+            text = raw.strip()
+            if not text:
+                mutable['bullet_points'] = []
+            else:
+                try:
+                    parsed = json.loads(text)
+                    mutable['bullet_points'] = parsed if isinstance(parsed, list) else [text]
+                except Exception:
+                    mutable['bullet_points'] = [item.strip() for item in text.replace(',', '\n').splitlines() if item.strip()]
+        return super().to_internal_value(mutable)
+
+    def validate_bullet_points(self, value):
+        return [str(item).strip() for item in value if str(item).strip()]
+
     class Meta: model=AboutSection; fields='__all__'
 class InfoCardSerializer(serializers.ModelSerializer):
     class Meta: model=InfoCard; fields='__all__'
@@ -25,19 +51,30 @@ class StatisticSerializer(serializers.ModelSerializer):
 class TeamSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=TeamMember; fields='__all__'
 class EnquiryItemSerializer(serializers.ModelSerializer):
-    service_title_snapshot=serializers.CharField(read_only=True)
+    service=serializers.PrimaryKeyRelatedField(queryset=Service.objects.all(),required=False,allow_null=True,error_messages={'does_not_exist':'One selected service is no longer available. Please remove it and select again.','incorrect_type':'One selected service is no longer available. Please remove it and select again.'})
+    service_title_snapshot=serializers.CharField(required=False,allow_blank=True)
+    note=serializers.CharField(required=False,allow_blank=True)
+    quantity=serializers.IntegerField(required=False,min_value=1,default=1)
     class Meta: model=EnquiryItem; fields=['id','service','service_title_snapshot','note','quantity']
 class EnquirySerializer(serializers.ModelSerializer):
+    full_name=serializers.CharField(required=True,error_messages={'blank':'Please enter your full name.','required':'Please enter your full name.'})
+    phone=serializers.CharField(required=True,error_messages={'blank':'Please enter your phone number.','required':'Please enter your phone number.'})
+    location=serializers.CharField(required=True,error_messages={'blank':'Please enter your project location.','required':'Please enter your project location.'})
     items=EnquiryItemSerializer(many=True)
     class Meta: model=Enquiry; fields='__all__'; read_only_fields=['status','admin_note','created_at','updated_at']
     def validate_items(self,v):
         if not v: raise serializers.ValidationError('Select at least one service.')
+        for item in v:
+            if not item.get('service') and not str(item.get('service_title_snapshot','')).strip():
+                raise serializers.ValidationError('Each enquiry item must include a service or service name.')
         return v
     def create(self,validated):
         items=validated.pop('items'); enquiry=Enquiry.objects.create(**validated)
         for item in items:
-            service=item.get('service'); title=service.title if service else item.get('service_title_snapshot','Service')
-            EnquiryItem.objects.create(enquiry=enquiry,service_title_snapshot=title,**item)
+            service=item.get('service'); snapshot=str(item.get('service_title_snapshot','')).strip()
+            if service: snapshot=service.title
+            if not snapshot: snapshot='Requested service'
+            EnquiryItem.objects.create(enquiry=enquiry,service=service,service_title_snapshot=snapshot,note=item.get('note',''),quantity=item.get('quantity',1) or 1)
         return enquiry
 class EnquiryAdminSerializer(serializers.ModelSerializer):
     items=EnquiryItemSerializer(many=True,read_only=True)

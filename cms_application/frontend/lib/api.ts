@@ -13,6 +13,32 @@ export function clearAdminToken() {
   if (typeof window !== 'undefined') localStorage.removeItem('admin-token');
 }
 
+function flattenApiErrors(value: unknown, prefix = ''): string[] {
+  if (!value) return [];
+  if (typeof value === 'string') return [prefix ? `${prefix}: ${value}` : value];
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => flattenApiErrors(item, prefix ? `${prefix} ${index + 1}` : ''));
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, val]) => {
+      const label = prefix ? `${prefix}.${key}` : key;
+      return flattenApiErrors(val, label);
+    });
+  }
+  return [String(value)];
+}
+
+function friendlyApiMessage(message: string) {
+  const lower = message.toLowerCase();
+  if (lower.includes('invalid pk') || lower.includes('no longer available') || lower.includes('object does not exist')) return 'One selected service is no longer available. Please remove it and select again.';
+  if (lower.includes('bullet_points') && (lower.includes('valid json') || lower.includes('not a valid list'))) return 'Please write one bullet point per line.';
+  if (lower.includes('items') && (lower.includes('required') || lower.includes('empty') || lower.includes('select at least one'))) return 'Please select at least one service.';
+  if (lower.includes('full_name')) return 'Please enter your full name.';
+  if (lower.includes('phone')) return 'Please enter your phone number.';
+  if (lower.includes('location')) return 'Please enter project location.';
+  return message;
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   const headers = new Headers(init.headers);
@@ -37,11 +63,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!window.location.pathname.includes('/admin/login')) window.location.assign('/admin/login');
   }
   if (!response.ok) {
-    const data = body as { detail?: string; non_field_errors?: string[] } | null;
-    const detail = data && typeof data === 'object'
-      ? data.detail || data.non_field_errors?.join(' ') || Object.values(data).flat().filter(value => typeof value === 'string').join(' ')
-      : '';
-    const message = detail || `Request failed with status ${response.status}`;
+    const errors = flattenApiErrors(body);
+    const message = errors.length > 0 ? errors.map(friendlyApiMessage).join(' ') : `Request failed with status ${response.status}`;
     throw new Error(message);
   }
   return response.status === 204 ? (undefined as T) : body as T;
