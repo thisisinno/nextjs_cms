@@ -31,7 +31,7 @@ function flattenApiErrors(value: unknown, prefix = ''): string[] {
 function friendlyApiMessage(message: string) {
   const lower = message.toLowerCase();
   if (lower.includes('invalid pk') || lower.includes('no longer available') || lower.includes('object does not exist')) return 'One selected service is no longer available. Please remove it and select again.';
-  if (lower.includes('bullet_points') && (lower.includes('valid json') || lower.includes('not a valid list'))) return 'Please write one bullet point per line.';
+  if (lower.includes('bullet_points') && (lower.includes('valid json') || lower.includes('not a valid list') || lower.includes('not a valid string'))) return 'Please check your bullet points. Write one short point per row.';
   if (lower.includes('items') && (lower.includes('required') || lower.includes('empty') || lower.includes('select at least one'))) return 'Please select at least one service.';
   if (lower.includes('full_name')) return 'Please enter your full name.';
   if (lower.includes('phone')) return 'Please enter your phone number.';

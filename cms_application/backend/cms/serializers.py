@@ -1,7 +1,71 @@
-import json
-
 from rest_framework import serializers
 from .models import *
+
+class FlexibleStringListField(serializers.Field):
+    default_error_messages = {
+        'invalid': 'Write one bullet point per line.',
+    }
+
+    def to_representation(self, value):
+        if value in (None, ''):
+            return []
+
+        if isinstance(value, list):
+            return [str(item).strip() for item in self._flatten(value) if str(item).strip()]
+
+        if isinstance(value, str):
+            return self._parse_string(value)
+
+        return [str(value).strip()] if str(value).strip() else []
+
+    def to_internal_value(self, data):
+        if data in (None, ''):
+            return []
+
+        if isinstance(data, list):
+            values = []
+            for item in self._flatten(data):
+                if isinstance(item, str):
+                    values.extend(self._parse_string(item))
+                elif item is not None:
+                    values.append(str(item).strip())
+            return [item for item in values if item]
+
+        if isinstance(data, str):
+            return self._parse_string(data)
+
+        return [str(data).strip()] if str(data).strip() else []
+
+    def _flatten(self, value):
+        for item in value:
+            if isinstance(item, list):
+                yield from self._flatten(item)
+            else:
+                yield item
+
+    def _parse_string(self, text):
+        import json
+
+        text = str(text).strip()
+        if not text:
+            return []
+
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [
+                    str(item).strip()
+                    for item in self._flatten(parsed)
+                    if str(item).strip()
+                ]
+        except Exception:
+            pass
+
+        return [
+            item.strip()
+            for item in text.replace(',', '\n').splitlines()
+            if item.strip()
+        ]
 
 class ImageValidationMixin:
     def validate_image(self, image):
@@ -12,26 +76,7 @@ class SiteSettingSerializer(ImageValidationMixin, serializers.ModelSerializer):
 class HeroSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=HeroSection; fields='__all__'
 class AboutSerializer(ImageValidationMixin, serializers.ModelSerializer):
-    bullet_points = serializers.ListField(
-        child=serializers.CharField(),
-        required=False,
-        allow_empty=True,
-    )
-
-    def to_internal_value(self, data):
-        mutable = data.copy()
-        raw = mutable.get('bullet_points')
-        if isinstance(raw, str):
-            text = raw.strip()
-            if not text:
-                mutable['bullet_points'] = []
-            else:
-                try:
-                    parsed = json.loads(text)
-                    mutable['bullet_points'] = parsed if isinstance(parsed, list) else [text]
-                except Exception:
-                    mutable['bullet_points'] = [item.strip() for item in text.replace(',', '\n').splitlines() if item.strip()]
-        return super().to_internal_value(mutable)
+    bullet_points = FlexibleStringListField(required=False)
 
     def validate_bullet_points(self, value):
         return [str(item).strip() for item in value if str(item).strip()]
