@@ -5,10 +5,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import type { Project, Service } from '@/lib/types';
 import { Loader } from '@/components/Loader';
-import { AnimatedSection, getPublicLanguage, Placeholder, ProjectCard, PublicLanguage, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
+import { AnimatedSection, Placeholder, ProjectCard, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
 import { useCart } from '@/components/cart';
 import { useEnquiryModal } from '@/components/enquiry-modal-context';
 import { AdminLoginModal } from '@/components/AdminLoginModal';
+import { useLanguage } from '@/components/language-context';
 
 const serviceStrip = [
   { en: 'Buildings Construction', sw: 'Ujenzi wa Majengo' },
@@ -29,17 +30,10 @@ const fallbackPortfolio = 'We take pride in delivering high-quality construction
 export default function HomePage() {
   const [data, setData] = useState<any>();
   const [category, setCategory] = useState('all'), [detail, setDetail] = useState<Service | null>(null), [notice, setNotice] = useState(''), [adminOpen, setAdminOpen] = useState(false);
-  const [language, setLanguage] = useState<PublicLanguage>('en');
+  const { language, t, pick, translateCms } = useLanguage();
 
   useEffect(() => {
     api<any>('/home/').then(setData).catch(() => setData({}));
-  }, []);
-
-  useEffect(() => {
-    setLanguage(getPublicLanguage());
-    const onLanguage = (event: Event) => setLanguage((event as CustomEvent<PublicLanguage>).detail || getPublicLanguage());
-    window.addEventListener('sccl:language', onLanguage);
-    return () => window.removeEventListener('sccl:language', onLanguage);
   }, []);
 
   const showLoader = (label: string) => {
@@ -49,18 +43,17 @@ export default function HomePage() {
   const services: Service[] = data?.services?.length ? data.services : data?.featured_services?.length ? data.featured_services : fallbackServices;
   const allProjects: Project[] = data?.projects?.length ? data.projects : data?.featured_projects?.length ? data.featured_projects : fallbackProjects;
   const projects = useMemo(() => allProjects.filter((item) => category === 'all' || item.category === category), [allProjects, category]);
-  if (!data) return <Loader />;
+  if (!data) return <Loader label="Loading" fullScreen size="large" />;
 
   const hero = data.hero || {}, site = data.site_settings || {}, about = data.about || {};
   const stats = data.stats?.length ? data.stats : fallbackStats;
   const team = data.team?.length ? data.team : fallbackTeam;
   const bullets = Array.isArray(about.bullet_points) && about.bullet_points.length ? about.bullet_points : fallbackBullets;
+  const swBullets = Array.isArray(about.bullet_points_sw) && about.bullet_points_sw.length ? about.bullet_points_sw : [];
+  const visibleBullets = language === 'sw' && swBullets.length ? swBullets : bullets;
   const thumbnails = allProjects.filter((project) => project.image).slice(0, 5);
   const testimonial = team[0] || fallbackTeam[0];
-  const text = dictionary[language];
-  const categoryLabels = language === 'sw'
-    ? { all: 'ZOTE', completed: 'ZILIZOKAMILIKA', ongoing: 'ZINAZOENDELEA', daily: 'KILA SIKU' }
-    : { all: 'ALL', completed: 'COMPLETED', ongoing: 'CONTINUES', daily: 'DAILY' };
+  const categoryLabels = { all: t('all'), completed: t('completed'), ongoing: t('continues'), daily: t('daily') };
 
   return <main>
     <section id="home" className="sccl-hero">
@@ -69,21 +62,21 @@ export default function HomePage() {
       <div className="hero-overlay" />
       <div className="wrap hero-center-content">
         <motion.div className="hero-title-block" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
-          <h1>{hero.title || 'G&S CONTRACTORS LTD'}</h1>
-          <p>{hero.subtitle || hero.description || text.heroSubtitle}</p>
+          <h1>{translateCms(hero, 'title', 'G&S CONTRACTORS LTD')}</h1>
+          <p>{translateCms(hero, 'subtitle', language === 'sw' ? 'TUNAJENGA KWA UBORA. TUNATOA MATOKEO BORA.' : 'BUILDING QUALITY. DELIVERING EXCELLENCE.')}</p>
         </motion.div>
-        <StaggerGroup className="hero-service-strip">{serviceStrip.map((service, index) => <RevealCard onClick={() => { showLoader(text.loadingServices); scrollToSection('services'); }} className="hero-service-box" key={service.en}><span><LineIcon index={index} /></span><b>{service[language]}</b></RevealCard>)}</StaggerGroup>
+        <StaggerGroup className="hero-service-strip">{serviceStrip.map((service, index) => <RevealCard onClick={() => { showLoader(t('openingServices')); scrollToSection('services'); }} className="hero-service-box" key={service.en}><span><LineIcon index={index} /></span><b>{pick(service.en, service.sw)}</b></RevealCard>)}</StaggerGroup>
       </div>
-      <button className="hero-admin-login" onClick={() => setAdminOpen(true)}>{text.login}</button>
+      <button className="hero-admin-login" onClick={() => setAdminOpen(true)}>{t('login')}</button>
     </section>
 
     <section id="about" className="sccl-section bg-white">
       <div className="wrap about-layout">
         <AnimatedSection>
-          <SectionHeader eyebrow={text.about} title={about.title || text.aboutTitle} />
+          <SectionHeader eyebrow={t('about')} title={translateCms(about, 'title', language === 'sw' ? 'Karibu G&S Contractors LTD' : 'Welcome To G&S Contractors LTD')} />
           <p className="about-intro">{fallbackAbout}</p>
-          <p>{about.description || fallbackAbout}</p>
-          <ul className="about-checklist">{bullets.map((point: string) => <li key={point}>{point}</li>)}</ul>
+          <p>{translateCms(about, 'description', fallbackAbout)}</p>
+          <ul className="about-checklist">{visibleBullets.map((point: string) => <li key={point}>{point}</li>)}</ul>
         </AnimatedSection>
         <AnimatedSection className="about-media">{about.image ? <img src={about.image} alt="Construction project" /> : <Placeholder label="G&S Contractors LTD" kind="about" />}</AnimatedSection>
       </div>
@@ -92,15 +85,15 @@ export default function HomePage() {
 
     <section id="services" className="sccl-section bg-white">
       <div className="wrap">
-        <AnimatedSection><SectionHeader eyebrow={text.services} title={text.servicesTitle} /></AnimatedSection>
-        <StaggerGroup className="services-grid">{services.map((service) => <ServiceCard key={service.id} service={service} onDetails={(item) => { showLoader(text.loadingDetails); setDetail(item); }} onAdded={(fresh) => setNotice(fresh ? text.added : text.alreadyAdded)} />)}</StaggerGroup>
+        <AnimatedSection><SectionHeader eyebrow={t('services')} title={t('checkOurServices')} /></AnimatedSection>
+        <StaggerGroup className="services-grid">{services.map((service) => <ServiceCard key={service.id} service={service} onDetails={(item) => { showLoader(t('openingServiceDetails')); setDetail(item); }} onAdded={(fresh) => setNotice(fresh ? t('serviceAdded') : t('serviceAlreadyInEnquiry'))} />)}</StaggerGroup>
       </div>
     </section>
 
     <section id="projects" className="sccl-section projects-section">
       <div className="wrap">
-        <AnimatedSection><SectionHeader eyebrow={text.advertisements} title={text.advertisementsTitle} text={fallbackPortfolio} /></AnimatedSection>
-        <div className="filter-tabs">{categoryTabs.map((item) => <button key={item.value} onClick={() => { showLoader(text.loadingProjects); setCategory(item.value); }} className={category === item.value ? 'is-active' : ''}>{categoryLabels[item.value as keyof typeof categoryLabels] || item.label}</button>)}</div>
+        <AnimatedSection><SectionHeader eyebrow={t('advertisement')} title={t('checkOurAdvertisements')} text={fallbackPortfolio} /></AnimatedSection>
+        <div className="filter-tabs">{categoryTabs.map((item) => <button key={item.value} onClick={() => { showLoader(t('updatingProjects')); setCategory(item.value); }} className={category === item.value ? 'is-active' : ''}>{categoryLabels[item.value as keyof typeof categoryLabels] || item.label}</button>)}</div>
         <motion.div layout className="project-masonry">{projects.map((project) => <ProjectCard key={project.id} project={project} />)}</motion.div>
       </div>
     </section>
@@ -110,8 +103,8 @@ export default function HomePage() {
         <AnimatedSection className="company-logo-panel">{site.logo ? <img src={site.logo} alt={site.company_name || 'Company logo'} /> : <div className="text-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></div>}</AnimatedSection>
         <AnimatedSection>
           <h2>{site.company_name || 'G&S Contractors LTD'}</h2>
-          <p>{text.proud}</p>
-          <div className="stats-list">{stats.slice(0, 3).map((stat: any) => <Stat key={stat.id || stat.label} value={Number(stat.value) || 0} suffix={stat.suffix} label={stat.label} />)}</div>
+          <p>{t('weAreProudOn')}</p>
+          <div className="stats-list">{stats.slice(0, 3).map((stat: any) => <Stat key={stat.id || stat.label} value={Number(stat.value) || 0} suffix={stat.suffix} label={translateCms(stat, 'label', stat.label)} />)}</div>
         </AnimatedSection>
       </div>
     </section>
@@ -120,12 +113,12 @@ export default function HomePage() {
       <div className="wrap testimonial-inner">
         <div className="testimonial-photo">{testimonial.photo ? <img src={testimonial.photo} alt={testimonial.name} /> : <span>{initials(testimonial.name)}</span>}</div>
         <h3>{testimonial.name || 'Adam Abdalla Said (Natepe)'}</h3>
-        <p className="role">{testimonial.position || 'Manager SCCL.'}</p>
-        <blockquote>{testimonial.message || 'We are going to make SCCL the best Construction Company throughout.'}</blockquote>
+        <p className="role">{translateCms(testimonial, 'position', 'Manager SCCL.')}</p>
+        <blockquote>{translateCms(testimonial, 'message', 'We are going to make SCCL the best Construction Company throughout.')}</blockquote>
       </div>
     </section>
 
-    <ContactSection site={site} notify={setNotice} language={language} />
+    <ContactSection site={site} notify={setNotice} />
     <Footer site={site} openAdmin={() => setAdminOpen(true)} />
     <button className="back-to-top" onClick={() => scrollToSection('home')} aria-label="Back to top">↑</button>
 
@@ -134,63 +127,6 @@ export default function HomePage() {
     {notice && <button onClick={() => setNotice('')} className="notice-toast">{notice}</button>}
   </main>;
 }
-
-const dictionary = {
-  en: {
-    heroSubtitle: 'BUILDING QUALITY. DELIVERING EXCELLENCE.',
-    login: 'Login',
-    about: 'About',
-    aboutTitle: 'Welcome To G&S Contractors LTD',
-    services: 'Services',
-    servicesTitle: 'Check Our Services',
-    advertisements: 'Advertisements',
-    advertisementsTitle: 'Check Our Advertisements',
-    proud: 'We are proud on:',
-    added: 'Service added to enquiry',
-    alreadyAdded: 'Service already in enquiry cart',
-    loadingServices: 'Opening services',
-    loadingDetails: 'Opening service details',
-    loadingProjects: 'Updating projects',
-    contact: 'Contact',
-    contactTitle: 'Contact Us',
-    quoteTitle: 'Need a quotation?',
-    quoteText: 'Select services and submit your enquiry.',
-    quoteOpen: 'Open enquiry form',
-    quoteComplete: 'Complete enquiry',
-    sending: 'Sending...',
-    send: 'Send Message',
-    received: 'Thank you. We have received your message.',
-    enquiryTitle: 'Your enquiry',
-    clear: 'Clear selected services',
-  },
-  sw: {
-    heroSubtitle: 'TUNAJENGA UBORA. TUNAKAMILISHA KWA UMAKINI.',
-    login: 'Ingia',
-    about: 'Kuhusu',
-    aboutTitle: 'Karibu G&S Contractors LTD',
-    services: 'Huduma',
-    servicesTitle: 'Angalia Huduma Zetu',
-    advertisements: 'Matangazo',
-    advertisementsTitle: 'Angalia Matangazo Yetu',
-    proud: 'Tunajivunia:',
-    added: 'Huduma imeongezwa kwenye ombi',
-    alreadyAdded: 'Huduma tayari ipo kwenye ombi',
-    loadingServices: 'Inafungua huduma',
-    loadingDetails: 'Inafungua maelezo ya huduma',
-    loadingProjects: 'Inasasisha miradi',
-    contact: 'Mawasiliano',
-    contactTitle: 'Wasiliana Nasi',
-    quoteTitle: 'Unahitaji makadirio?',
-    quoteText: 'Chagua huduma kisha tuma ombi lako.',
-    quoteOpen: 'Fungua fomu ya ombi',
-    quoteComplete: 'Kamilisha ombi',
-    sending: 'Inatuma...',
-    send: 'Tuma Ujumbe',
-    received: 'Asante. Tumepokea ujumbe wako.',
-    enquiryTitle: 'Ombi lako',
-    clear: 'Futa huduma ulizochagua',
-  },
-};
 
 function Stat({ value, suffix, label }: { value: number; suffix?: string; label: string }) {
   const [display, setDisplay] = useState(0);
@@ -209,19 +145,21 @@ function Stat({ value, suffix, label }: { value: number; suffix?: string; label:
 function ServiceDetail({ service, close, notify }: { service: Service; close: () => void; notify: (message: string) => void }) {
   const { add, items } = useCart();
   const { openEnquiry } = useEnquiryModal();
+  const { t, translateCms } = useLanguage();
+  const title = translateCms(service, 'title', service.title);
   return <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm">
     <motion.div initial={{ opacity: 0, scale: .94, y: 18 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .96, y: 10 }} className="premium-modal max-h-[88vh] w-full max-w-3xl overflow-y-auto p-0">
-      <div className="architectural-placeholder min-h-48 p-7 text-white"><div className="flex justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.2em] text-gold">{service.category || 'Service'}</p><h2 className="mt-3 text-3xl font-black">{service.title}</h2></div><button onClick={close} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-xl">x</button></div></div>
-      <div className="p-7"><p className="whitespace-pre-line text-slate-600">{service.full_description}</p><div className="mt-7 flex flex-wrap gap-3"><button className="btn btn-gold" onClick={() => { const fresh = !items.some((item) => item.service === service.id); add(service); notify(fresh ? 'Service added to enquiry' : 'Service already in enquiry cart'); }}>Add to enquiry</button><button className="btn btn-dark" onClick={() => { add(service); close(); openEnquiry(); }}>Complete enquiry</button></div></div>
+      <div className="architectural-placeholder min-h-48 p-7 text-white"><div className="flex justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.2em] text-gold">{translateCms(service, 'category', service.category || t('services'))}</p><h2 className="mt-3 text-3xl font-black">{title}</h2></div><button onClick={close} aria-label="Close" className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-xl">x</button></div></div>
+      <div className="p-7"><p className="whitespace-pre-line text-slate-600">{translateCms(service, 'full_description', service.full_description)}</p><div className="mt-7 flex flex-wrap gap-3"><button className="btn btn-gold" onClick={() => { const fresh = !items.some((item) => item.service === service.id); add(service); notify(fresh ? t('serviceAdded') : t('serviceAlreadyInEnquiry')); }}>{t('addToEnquiry')}</button><button className="btn btn-dark" onClick={() => { add(service); close(); openEnquiry(); }}>{t('completeEnquiry')}</button></div></div>
     </motion.div>
   </div>;
 }
 
-function ContactSection({ site, notify, language }: { site: any; notify: (message: string) => void; language: PublicLanguage }) {
+function ContactSection({ site, notify }: { site: any; notify: (message: string) => void }) {
   const { items, totalItems, remove, clear } = useCart();
   const { openEnquiry } = useEnquiryModal();
   const [sending, setSending] = useState(false);
-  const text = dictionary[language];
+  const { t, translateCms } = useLanguage();
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSending(true);
@@ -229,7 +167,7 @@ function ContactSection({ site, notify, language }: { site: any; notify: (messag
       const fields = Object.fromEntries(new FormData(event.currentTarget));
       await api('/contact-messages/', { method: 'POST', body: JSON.stringify(fields) });
       event.currentTarget.reset();
-      notify(text.received);
+      notify(t('thankYouReceived'));
     } catch (error: any) {
       notify(error.message);
     } finally {
@@ -239,24 +177,24 @@ function ContactSection({ site, notify, language }: { site: any; notify: (messag
 
   return <section id="contact" className="sccl-section contact-section">
     <div className="wrap">
-      <AnimatedSection><SectionHeader eyebrow={text.contact} title={text.contactTitle} /></AnimatedSection>
+      <AnimatedSection><SectionHeader eyebrow={t('contact')} title={t('contactUs')} /></AnimatedSection>
       <iframe className="contact-map" title="Zanzibar map" src="https://www.google.com/maps?q=Zanzibar,Tanzania&output=embed" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
       <div className="contact-grid">
         <AnimatedSection className="contact-info-list">
-          <ContactCard title="Location" value={site.address || site.location || 'Zanzibar, Tanzania'} />
-          <ContactCard title="Email" value={site.email || 'info@gscontractorsltd.com'} />
-          <ContactCard title="Call" value={[site.primary_phone || '+255 745 113 963', site.secondary_phone || '+255 776 187 485'].filter(Boolean).join(' / ')} />
-          <div id="enquiry" className="enquiry-panel"><b>{text.quoteTitle}</b><p>{text.quoteText}</p><button type="button" onClick={openEnquiry}>{items.length ? `${text.quoteComplete} - ${totalItems}` : text.quoteOpen}</button></div>
+          <ContactCard title={t('location')} value={translateCms(site, 'address', translateCms(site, 'location', 'Zanzibar, Tanzania'))} />
+          <ContactCard title={t('email')} value={site.email || 'info@gscontractorsltd.com'} />
+          <ContactCard title={t('call')} value={[site.primary_phone || '+255 745 113 963', site.secondary_phone || '+255 776 187 485'].filter(Boolean).join(' / ')} />
+          <div id="enquiry" className="enquiry-panel"><b>{t('needQuotation')}</b><p>{t('selectServicesSubmit')}</p><button type="button" onClick={openEnquiry}>{items.length ? `${t('completeEnquiry')} - ${totalItems}` : t('openEnquiryForm')}</button></div>
         </AnimatedSection>
         <AnimatedSection>
           <form className="contact-form" onSubmit={submit}>
-            <input name="full_name" required placeholder="Your Name" />
-            <input type="email" name="email" placeholder="Your Email" />
-            <input name="subject" placeholder="Subject" />
-            <textarea name="message" required placeholder="Message" />
-            <button disabled={sending}>{sending ? text.sending : text.send}</button>
+            <input name="full_name" required placeholder={t('yourName')} />
+            <input type="email" name="email" placeholder={t('yourEmail')} />
+            <input name="subject" placeholder={t('subject')} />
+            <textarea name="message" required placeholder={t('message')} />
+            <button disabled={sending}>{sending ? <span className="button-loading"><Loader label="" fullScreen={false} size="small" />{t('sending')}</span> : t('sendMessage')}</button>
           </form>
-          {items.length > 0 && <div className="selected-services"><b>{text.enquiryTitle}</b>{items.map((item) => <p key={item.service}>{item.service_title_snapshot}<button type="button" onClick={() => remove(item.service)}>x</button></p>)}<button type="button" onClick={clear}>{text.clear}</button></div>}
+          {items.length > 0 && <div className="selected-services"><b>{t('yourEnquiry')}</b>{items.map((item) => <p key={item.service}>{item.service_title_snapshot}<button type="button" onClick={() => remove(item.service)}>x</button></p>)}<button type="button" onClick={clear}>{t('clearSelectedServices')}</button></div>}
         </AnimatedSection>
       </div>
     </div>
@@ -268,12 +206,13 @@ function ContactCard({ title, value }: { title: string; value: string }) {
 }
 
 function Footer({ site, openAdmin }: { site: any; openAdmin: () => void }) {
+  const { t, translateCms } = useLanguage();
   return <footer className="footer-dark">
     <div className="wrap footer-grid">
-      <div><p className="footer-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></p><p>{site.address || site.location || 'Zanzibar, Tanzania'}</p><p>{site.primary_phone || '+255 745 113 963'}</p><p>{site.email || 'info@gscontractorsltd.com'}</p><div className="social-row">{site.facebook_url && <a href={site.facebook_url}>f</a>}{site.instagram_url && <a href={site.instagram_url}>ig</a>}{site.whatsapp_number && <a href={`https://wa.me/${String(site.whatsapp_number).replace(/\D/g, '')}`}>wa</a>}</div></div>
-      <div><h3>Working Days</h3><p>{site.working_days || 'Monday - Saturday'}</p></div>
-      <div><h3>Services Time</h3><p>{site.working_hours || '08:00 - 17:00'}</p></div>
-      <div><h3>Company</h3><p>{site.footer_text || 'Welcome to G&S Contractors LTD. Building quality and delivering excellence across Zanzibar, Tanzania.'}</p><button onClick={openAdmin}>Admin login</button></div>
+      <div><p className="footer-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></p><p>{translateCms(site, 'address', translateCms(site, 'location', 'Zanzibar, Tanzania'))}</p><p>{site.primary_phone || '+255 745 113 963'}</p><p>{site.email || 'info@gscontractorsltd.com'}</p><div className="social-row">{site.facebook_url && <a href={site.facebook_url}>f</a>}{site.instagram_url && <a href={site.instagram_url}>ig</a>}{site.whatsapp_number && <a href={`https://wa.me/${String(site.whatsapp_number).replace(/\D/g, '')}`}>wa</a>}</div></div>
+      <div><h3>{t('workingDays')}</h3><p>{translateCms(site, 'working_days', 'Monday - Saturday')}</p></div>
+      <div><h3>{t('servicesTime')}</h3><p>{translateCms(site, 'working_hours', '08:00 - 17:00')}</p></div>
+      <div><h3>{t('company')}</h3><p>{translateCms(site, 'footer_text', 'Welcome to G&S Contractors LTD. Building quality and delivering excellence across Zanzibar, Tanzania.')}</p><button onClick={openAdmin}>Admin login</button></div>
     </div>
   </footer>;
 }

@@ -4,26 +4,34 @@ import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useState } from 'reac
 import { api, getAdminToken } from '@/lib/api';
 import { AdminRows } from '@/components/AdminRows';
 import { ImageUploader } from '@/components/ImageUploader';
+import { Loader } from '@/components/Loader';
 
 const config: Record<string, { endpoint: string; title: string; fields: string[] }> = {
-  services: { endpoint: '/admin/services/', title: 'Services', fields: ['title', 'slug', 'category', 'short_description', 'full_description', 'image', 'icon', 'display_order', 'is_active'] },
-  projects: { endpoint: '/admin/projects/', title: 'Projects', fields: ['title', 'slug', 'category', 'description', 'image', 'status', 'location', 'start_date', 'end_date', 'is_featured', 'display_order', 'is_active'] },
-  home: { endpoint: '/admin/hero/', title: 'Hero content', fields: ['title', 'subtitle', 'description', 'background_image', 'primary_button_text', 'primary_button_link', 'secondary_button_text', 'secondary_button_link', 'is_active'] },
-  about: { endpoint: '/admin/about/', title: 'About content', fields: ['title', 'description', 'image', 'bullet_points', 'is_active'] },
+  services: { endpoint: '/admin/services/', title: 'Services', fields: ['title', 'title_sw', 'slug', 'category', 'category_sw', 'short_description', 'short_description_sw', 'full_description', 'full_description_sw', 'image', 'icon', 'display_order', 'is_active'] },
+  projects: { endpoint: '/admin/projects/', title: 'Projects', fields: ['title', 'title_sw', 'slug', 'category', 'description', 'description_sw', 'image', 'status', 'status_sw', 'location', 'location_sw', 'start_date', 'end_date', 'is_featured', 'display_order', 'is_active'] },
+  home: { endpoint: '/admin/hero/', title: 'Hero content', fields: ['title', 'title_sw', 'subtitle', 'subtitle_sw', 'description', 'description_sw', 'background_image', 'primary_button_text', 'primary_button_link', 'secondary_button_text', 'secondary_button_link', 'is_active'] },
+  about: { endpoint: '/admin/about/', title: 'About content', fields: ['title', 'title_sw', 'description', 'description_sw', 'image', 'bullet_points', 'bullet_points_sw', 'is_active'] },
   info: { endpoint: '/admin/info-cards/', title: 'Vision, mission and focus', fields: ['type', 'title', 'description', 'icon', 'display_order', 'is_active'] },
-  team: { endpoint: '/admin/team/', title: 'Team', fields: ['name', 'position', 'message', 'photo', 'display_order', 'is_active'] },
-  stats: { endpoint: '/admin/statistics/', title: 'Statistics', fields: ['label', 'value', 'suffix', 'display_order', 'is_active'] },
-  settings: { endpoint: '/admin/settings/', title: 'Site settings', fields: ['company_name', 'logo', 'primary_phone', 'secondary_phone', 'email', 'location', 'address', 'working_days', 'working_hours', 'footer_text', 'facebook_url', 'instagram_url', 'whatsapp_number'] },
+  team: { endpoint: '/admin/team/', title: 'Team', fields: ['name', 'position', 'position_sw', 'message', 'message_sw', 'photo', 'display_order', 'is_active'] },
+  stats: { endpoint: '/admin/statistics/', title: 'Statistics', fields: ['label', 'label_sw', 'value', 'suffix', 'display_order', 'is_active'] },
+  settings: { endpoint: '/admin/settings/', title: 'Site settings', fields: ['company_name', 'logo', 'primary_phone', 'secondary_phone', 'email', 'location', 'location_sw', 'address', 'address_sw', 'working_days', 'working_days_sw', 'working_hours', 'working_hours_sw', 'footer_text', 'footer_text_sw', 'facebook_url', 'instagram_url', 'whatsapp_number'] },
 };
 
 const fieldTypes: Record<string, 'bullet-list' | 'textarea' | 'image' | 'boolean' | 'text'> = {
   bullet_points: 'bullet-list',
+  bullet_points_sw: 'bullet-list',
   description: 'textarea',
+  description_sw: 'textarea',
   full_description: 'textarea',
+  full_description_sw: 'textarea',
   short_description: 'textarea',
+  short_description_sw: 'textarea',
   message: 'textarea',
+  message_sw: 'textarea',
   footer_text: 'textarea',
+  footer_text_sw: 'textarea',
   address: 'textarea',
+  address_sw: 'textarea',
   image: 'image',
   background_image: 'image',
   logo: 'image',
@@ -68,7 +76,7 @@ function normalizeBulletPoints(value: unknown): string {
 }
 
 function normalizeFieldForSubmit(field: string, value: unknown) {
-  if (field === 'bullet_points') return normalizeBulletPoints(value);
+  if (field === 'bullet_points' || field === 'bullet_points_sw') return normalizeBulletPoints(value);
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value === null || value === undefined) return '';
   return String(value);
@@ -78,6 +86,7 @@ function friendlyError(message: string) {
   if (message.includes('bullet_points')) {
     return 'Please check your bullet points. Write one short point per row.';
   }
+  if (message.includes('Translation service is not configured')) return 'Translation service is not configured. You can still enter Kiswahili content manually.';
   return message;
 }
 
@@ -143,9 +152,36 @@ function Editor({ item, sectionName, config, close, saved }: any) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState('');
   const auth = { Authorization: `Bearer ${getAdminToken()}` };
   const image = config.fields.find((x: string) => fieldTypes[x] === 'image');
   const isAbout = sectionName === 'about';
+
+  async function autoTranslate(targetField: string) {
+    const sourceField = targetField.endsWith('_sw') ? targetField.slice(0, -3) : '';
+    if (!sourceField) return;
+    const sourceValue = values[sourceField];
+    setTranslating(targetField);
+    setError('');
+    setSuccess('');
+    try {
+      if (targetField === 'bullet_points_sw') {
+        const translated: string[] = [];
+        for (const item of toBulletRows(sourceValue).filter((row) => row.trim())) {
+          const result: any = await api('/admin/translate/', { method: 'POST', headers: auth, body: JSON.stringify({ text: item, source: 'en', target: 'sw' }) });
+          translated.push(result.translatedText || item);
+        }
+        setValues((current: any) => ({ ...current, [targetField]: translated }));
+      } else {
+        const result: any = await api('/admin/translate/', { method: 'POST', headers: auth, body: JSON.stringify({ text: sourceValue || '', source: 'en', target: 'sw' }) });
+        setValues((current: any) => ({ ...current, [targetField]: result.translatedText || current[targetField] || '' }));
+      }
+    } catch (e: any) {
+      setError(friendlyError(e.message));
+    } finally {
+      setTranslating('');
+    }
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -181,7 +217,7 @@ function Editor({ item, sectionName, config, close, saved }: any) {
         </div>
         <button type="button" onClick={close}>✕</button>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">{config.fields.map((field: string) => <Field key={field} field={field} value={values[field]} set={setValues} setFile={setFile} />)}</div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">{config.fields.map((field: string) => <Field key={field} field={field} value={values[field]} set={setValues} setFile={setFile} onAutoTranslate={field.endsWith('_sw') && config.fields.includes(field.slice(0, -3)) ? () => autoTranslate(field) : undefined} translating={translating === field} />)}</div>
       {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       {success && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{success}</p>}
       <div className="mt-6 flex gap-3"><button className="btn btn-gold" disabled={saving}>{saving ? 'Saving changes…' : 'Save changes'}</button><button type="button" className="btn" onClick={close}>Cancel</button></div>
@@ -189,16 +225,19 @@ function Editor({ item, sectionName, config, close, saved }: any) {
   </div>;
 }
 
-function Field({ field, value, set, setFile }: { field: string; value: any; set: any; setFile: any }) {
+function Field({ field, value, set, setFile, onAutoTranslate, translating }: { field: string; value: any; set: any; setFile: any; onAutoTranslate?: () => void; translating?: boolean }) {
   const type = fieldTypes[field] || 'text';
   const long = type === 'textarea' || type === 'bullet-list';
   const change = (e: ChangeEvent<any>) => set((v: any) => ({ ...v, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   if (type === 'image') return <ImageUploader label={field} current={typeof value === 'string' ? value : undefined} onChange={setFile} />;
   if (type === 'boolean') return <label className="flex items-center gap-2 pt-7 capitalize"><input type="checkbox" checked={!!value} onChange={change} />{labelFor(field)}</label>;
-  if (type === 'bullet-list') return <BulletListEditor value={value} onChange={(items) => set((v: any) => ({ ...v, [field]: items }))} />;
+  if (type === 'bullet-list') return <BulletListEditor field={field} value={value} onChange={(items) => set((v: any) => ({ ...v, [field]: items }))} onAutoTranslate={onAutoTranslate} translating={translating} />;
   if (field === 'category') return <label className="text-sm font-semibold">Category<select className="input mt-1" value={value || ''} onChange={change}><option value="">Select category</option>{['completed', 'ongoing', 'daily', 'featured'].map((x) => <option key={x}>{x}</option>)}</select></label>;
   if (field === 'type') return <label className="text-sm font-semibold">Card type<select className="input mt-1" value={value || 'vision'} onChange={change}>{['vision', 'mission', 'focus', 'value'].map((x) => <option key={x}>{x}</option>)}</select></label>;
-  return <label className={`text-sm font-semibold capitalize ${long ? 'sm:col-span-2' : ''}`}>{labelFor(field)}{type === 'textarea' ? <textarea className="input mt-1 min-h-28 font-normal" value={value || ''} onChange={change} placeholder={field === 'description' ? 'Write clear content for this section.' : undefined} /> : <input className="input mt-1 font-normal" type={field.includes('date') ? 'date' : field === 'email' ? 'email' : field === 'display_order' || field === 'value' ? 'number' : 'text'} value={value || ''} onChange={change} />}</label>;
+  return <label className={`text-sm font-semibold capitalize ${long ? 'sm:col-span-2' : ''}`}>
+    <span className="flex items-center justify-between gap-3">{labelFor(field)}{onAutoTranslate && <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs font-bold normal-case text-slate-700 disabled:opacity-60" onClick={onAutoTranslate} disabled={translating}>{translating ? <span className="button-loading"><Loader label="" fullScreen={false} size="small" />Translating</span> : 'Auto translate to Kiswahili'}</button>}</span>
+    {type === 'textarea' ? <textarea className="input mt-1 min-h-28 font-normal" value={value || ''} onChange={change} placeholder={field === 'description' ? 'Write clear content for this section.' : undefined} /> : <input className="input mt-1 font-normal" type={field.includes('date') ? 'date' : field === 'email' ? 'email' : field === 'display_order' || field === 'value' ? 'number' : 'text'} value={value || ''} onChange={change} />}
+  </label>;
 }
 
 function toBulletRows(value: unknown): string[] {
@@ -233,7 +272,7 @@ function toBulletRows(value: unknown): string[] {
   return [''];
 }
 
-function BulletListEditor({ value, onChange }: { value: unknown; onChange: (items: string[]) => void }) {
+function BulletListEditor({ field = 'bullet_points', value, onChange, onAutoTranslate, translating }: { field?: string; value: unknown; onChange: (items: string[]) => void; onAutoTranslate?: () => void; translating?: boolean }) {
   const rows = toBulletRows(value);
 
   const update = (index: number, next: string) => {
@@ -262,7 +301,10 @@ function BulletListEditor({ value, onChange }: { value: unknown; onChange: (item
 
   return <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-sand/60 p-4">
     <div>
-      <p className="text-sm font-bold">Bullet points</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-bold">{labelFor(field)}</p>
+        {onAutoTranslate && <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs font-bold text-slate-700 disabled:opacity-60" onClick={onAutoTranslate} disabled={translating}>{translating ? <span className="button-loading"><Loader label="" fullScreen={false} size="small" />Translating</span> : 'Auto translate to Kiswahili'}</button>}
+      </div>
       <p className="mt-1 text-xs text-slate-600">Write short points. These appear as checklist items on the About section.</p>
     </div>
     <div className="mt-3 space-y-2">

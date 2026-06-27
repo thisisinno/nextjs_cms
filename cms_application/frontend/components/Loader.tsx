@@ -1,18 +1,37 @@
 'use client';
 
-export function Loader({ label = 'Preparing your experience', fullScreen = true, overlay = false }: { label?: string; fullScreen?: boolean; overlay?: boolean }) {
-  const Tag = overlay ? 'div' : 'main';
-  return <Tag className={`premium-loader ${overlay ? 'loader-overlay' : fullScreen ? 'min-h-screen' : 'min-h-[360px]'}`} role="status" aria-live="polite">
-    <div className="loader-device" aria-hidden="true">
-      <div className="loader-speaker" />
-      <div className="loader-screen">
-        <span /><span /><span />
+import React from 'react';
+
+export function Loader({
+  label = 'Loading',
+  fullScreen = true,
+  overlay = false,
+  size = 'large',
+}: {
+  label?: string;
+  fullScreen?: boolean;
+  overlay?: boolean;
+  size?: 'small' | 'medium' | 'large';
+}) {
+  return (
+    <div
+      className={[
+        'smart-loader',
+        fullScreen ? 'is-fullscreen' : '',
+        overlay ? 'is-overlay' : '',
+        `is-${size}`,
+      ].join(' ')}
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+    >
+      <div className="ios-segment-spinner" aria-hidden="true">
+        {Array.from({ length: 12 }).map((_, index) => (
+          <span key={index} style={{ '--i': index } as React.CSSProperties} />
+        ))}
       </div>
-      <div className="loader-home" />
+
+      {label ? <p className="smart-loader-label">{label}</p> : null}
     </div>
-    <div className="loader-copy">
-      <p>SCCL<span>.</span></p>
-      <small>{label}</small>
-    </div>
-  </Tag>;
+  );
 }

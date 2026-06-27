@@ -14,29 +14,46 @@ class Command(BaseCommand):
                 'secondary_phone': '+255 776 187 485',
                 'email': 'info@gscontractorsltd.com',
                 'location': 'Zanzibar, Tanzania',
+                'location_sw': 'Zanzibar, Tanzania',
                 'address': 'Zanzibar, Tanzania',
+                'address_sw': 'Zanzibar, Tanzania',
                 'working_days': 'Monday - Saturday',
+                'working_days_sw': 'Jumatatu - Jumamosi',
                 'working_hours': '08:00 - 17:00',
+                'working_hours_sw': '08:00 - 17:00',
                 'footer_text': 'Welcome to G&S Contractors LTD. Building quality and delivering excellence across Zanzibar, Tanzania.',
+                'footer_text_sw': 'Karibu G&S Contractors LTD. Tunajenga kwa ubora na kutoa matokeo bora Zanzibar, Tanzania.',
             },
         )
         HeroSection.objects.get_or_create(
             title='G&S CONTRACTORS LTD',
             defaults={
+                'title_sw': 'G&S CONTRACTORS LTD',
                 'subtitle': 'BUILDING QUALITY. DELIVERING EXCELLENCE.',
-                'description': 'Trusted construction solutions across Zanzibar, Tanzania.',
+                'subtitle_sw': 'TUNAJENGA KWA UBORA. TUNATOA MATOKEO BORA.',
+                'description': 'Trusted construction services across Zanzibar and Tanzania.',
+                'description_sw': 'Huduma za ujenzi zinazoaminika Zanzibar na Tanzania.',
             },
         )
         AboutSection.objects.get_or_create(
             title='Welcome To G&S Contractors LTD',
             defaults={
+                'title_sw': 'Karibu G&S Contractors LTD',
                 'description': 'We are a trusted construction company committed to delivering exceptional building solutions across Zanzibar, Tanzania. We specialize in residential, commercial and infrastructure projects with a strong focus on quality, safety and client satisfaction.',
+                'description_sw': 'Sisi ni kampuni ya ujenzi inayoaminika inayotoa suluhisho bora za majengo Zanzibar, Tanzania.',
                 'bullet_points': [
                     'High quality workmanship',
                     'On-time project delivery',
                     'Cost effective solutions',
                     'Safety and integrity always',
                     'Client satisfaction guaranteed',
+                ],
+                'bullet_points_sw': [
+                    'Kazi yenye ubora wa juu',
+                    'Kukamilisha miradi kwa wakati',
+                    'Suluhisho zenye gharama nafuu',
+                    'Usalama na uadilifu kila wakati',
+                    'Kuridhika kwa mteja ni kipaumbele',
                 ],
             },
         )
@@ -50,21 +67,33 @@ class Command(BaseCommand):
                 title=title,
                 defaults={'description': description, 'display_order': i},
             )
-        for i, title in enumerate(['Luxury Villas', 'Swimming Pools', 'African Style Buildings', 'Renovations', 'Site Management', 'Project Management']):
+        services = [
+            ('Luxury Villas', 'Majumba ya Kifahari'),
+            ('Swimming Pools', 'Mabwawa ya Kuogelea'),
+            ('African Style Buildings', 'Majengo ya Mtindo wa Kiafrika'),
+            ('Renovations', 'Ukarabati'),
+            ('Site Management', 'Usimamizi wa Eneo la Ujenzi'),
+            ('Project Management', 'Usimamizi wa Mradi'),
+        ]
+        for i, (title, title_sw) in enumerate(services):
             Service.objects.get_or_create(
                 slug=title.lower().replace(' ', '-'),
                 defaults={
                     'title': title,
+                    'title_sw': title_sw,
                     'short_description': f'Professional {title.lower()} services delivered with quality, safety and client satisfaction.',
+                    'short_description_sw': f'Huduma za {title_sw.lower()} zinazotolewa kwa ubora, usalama na kuridhisha mteja.',
                     'full_description': f'G&S Contractors LTD provides {title.lower()} services for residential, commercial and infrastructure projects across Zanzibar, Tanzania.',
+                    'full_description_sw': f'G&S Contractors LTD inatoa huduma za {title_sw.lower()} kwa miradi ya makazi, biashara na miundombinu Zanzibar, Tanzania.',
                     'category': 'Construction',
+                    'category_sw': 'Ujenzi',
                     'display_order': i,
                 },
             )
-        for i, (label, value) in enumerate([('Happy Clients', 183), ('Projects', 2363), ('Years of experience', 5)]):
+        for i, (label, label_sw, value) in enumerate([('Happy Clients', 'Wateja Wenye Furaha', 183), ('Projects', 'Miradi', 2363), ('Years of experience', 'Miaka ya Uzoefu', 5)]):
             Statistic.objects.get_or_create(
                 label=label,
-                defaults={'value': value, 'suffix': '', 'display_order': i},
+                defaults={'label_sw': label_sw, 'value': value, 'suffix': '', 'display_order': i},
             )
         for i, (name, position, message) in enumerate([
             ('Said Ally Ahmed', 'Chief Executive Officer (CEO)', 'Leading G&S Contractors LTD with a focus on quality, reliability and client satisfaction.'),
@@ -73,6 +102,6 @@ class Command(BaseCommand):
         ]):
             TeamMember.objects.get_or_create(
                 name=name,
-                defaults={'position': position, 'message': message, 'display_order': i},
+                defaults={'position': position, 'position_sw': position, 'message': message, 'message_sw': message, 'display_order': i},
             )
         self.stdout.write(self.style.SUCCESS('CMS starter content is ready.'))

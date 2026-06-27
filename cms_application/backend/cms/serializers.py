@@ -77,8 +77,12 @@ class HeroSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=HeroSection; fields='__all__'
 class AboutSerializer(ImageValidationMixin, serializers.ModelSerializer):
     bullet_points = FlexibleStringListField(required=False)
+    bullet_points_sw = FlexibleStringListField(required=False)
 
     def validate_bullet_points(self, value):
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    def validate_bullet_points_sw(self, value):
         return [str(item).strip() for item in value if str(item).strip()]
 
     class Meta: model=AboutSection; fields='__all__'

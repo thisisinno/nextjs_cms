@@ -1,11 +1,14 @@
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db.models import Q
+import os
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework import status
 from .models import *
 from .serializers import *
+from .translation import translate_text
 
 class StaffWrite(permissions.BasePermission):
     def has_permission(self, request, view): return request.method in permissions.SAFE_METHODS or bool(request.user and request.user.is_staff)
@@ -58,3 +61,11 @@ def home(request):
 @permission_classes([permissions.IsAdminUser])
 def dashboard(request):
     return Response(DashboardSerializer({'enquiries':Enquiry.objects.count(),'new_enquiries':Enquiry.objects.filter(status='new').count(),'contact_messages':ContactMessage.objects.count(),'services':Service.objects.count(),'projects':Project.objects.count(),'recent_enquiries':Enquiry.objects.prefetch_related('items')[:8]}).data)
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_translate(request):
+    if not os.getenv('LIBRETRANSLATE_URL', '').strip():
+        return Response({'detail':'Translation service is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    translated = translate_text(request.data.get('text', ''), request.data.get('source', 'en'), request.data.get('target', 'sw'))
+    return Response({'translatedText': translated})
