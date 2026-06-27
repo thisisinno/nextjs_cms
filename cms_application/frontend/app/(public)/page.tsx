@@ -5,12 +5,18 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import type { Project, Service } from '@/lib/types';
 import { Loader } from '@/components/Loader';
-import { AnimatedSection, Placeholder, ProjectCard, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
+import { AnimatedSection, getPublicLanguage, Placeholder, ProjectCard, PublicLanguage, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
 import { useCart } from '@/components/cart';
 import { useEnquiryModal } from '@/components/enquiry-modal-context';
 import { AdminLoginModal } from '@/components/AdminLoginModal';
 
-const serviceStrip = ['Building Construction', 'Buildings Re-new', 'Interior & Exterior Design', 'Buildings Renovation', 'Architectural Design'];
+const serviceStrip = [
+  { en: 'Buildings Construction', sw: 'Ujenzi wa Majengo' },
+  { en: 'Buildings Re-new', sw: 'Uboreshaji wa Majengo' },
+  { en: 'Interior & Exterior Design', sw: 'Ubunifu wa Ndani na Nje' },
+  { en: 'Buildings Renovation', sw: 'Ukarabati wa Majengo' },
+  { en: 'Architectural Design', sw: 'Usanifu wa Majengo' },
+];
 const categoryTabs = [{ label: 'ALL', value: 'all' }, { label: 'COMPLETED', value: 'completed' }, { label: 'CONTINUES', value: 'ongoing' }, { label: 'DAILY', value: 'daily' }];
 const fallbackBullets = ['High quality workmanship', 'On-time project delivery', 'Cost effective solutions', 'Safety and integrity always', 'Client satisfaction guaranteed'];
 const fallbackServices: Service[] = ['Luxury Villas', 'Swimming Pools', 'African Style Buildings', 'Renovations', 'Site Management', 'Project Management'].map((title, index) => ({ id: -(index + 1), title, slug: title.toLowerCase().replaceAll(' ', '-'), category: 'Construction', short_description: ['Elegant residential construction with practical site delivery.', 'Durable pool construction, finishing and surrounding works.', 'Locally inspired buildings with modern construction standards.', 'Careful upgrades for homes, offices and commercial spaces.', 'Daily site coordination, quality checks and progress control.', 'Planning, procurement and delivery leadership for your build.'][index], full_description: 'Professional construction support delivered with quality, safety, clear communication and client satisfaction at the center.' }));
@@ -21,14 +27,24 @@ const fallbackAbout = 'We are a trusted construction company committed to delive
 const fallbackPortfolio = 'We take pride in delivering high-quality construction projects that stand the test of time. Our portfolio showcases a diverse range of residential, commercial, and infrastructure projects completed with precision, dedication, and attention to detail.';
 
 export default function HomePage() {
-  const { items } = useCart();
-  const { openEnquiry } = useEnquiryModal();
   const [data, setData] = useState<any>();
   const [category, setCategory] = useState('all'), [detail, setDetail] = useState<Service | null>(null), [notice, setNotice] = useState(''), [adminOpen, setAdminOpen] = useState(false);
+  const [language, setLanguage] = useState<PublicLanguage>('en');
 
   useEffect(() => {
     api<any>('/home/').then(setData).catch(() => setData({}));
   }, []);
+
+  useEffect(() => {
+    setLanguage(getPublicLanguage());
+    const onLanguage = (event: Event) => setLanguage((event as CustomEvent<PublicLanguage>).detail || getPublicLanguage());
+    window.addEventListener('sccl:language', onLanguage);
+    return () => window.removeEventListener('sccl:language', onLanguage);
+  }, []);
+
+  const showLoader = (label: string) => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('sccl:loading', { detail: { label } }));
+  };
 
   const services: Service[] = data?.services?.length ? data.services : data?.featured_services?.length ? data.featured_services : fallbackServices;
   const allProjects: Project[] = data?.projects?.length ? data.projects : data?.featured_projects?.length ? data.featured_projects : fallbackProjects;
@@ -41,23 +57,30 @@ export default function HomePage() {
   const bullets = Array.isArray(about.bullet_points) && about.bullet_points.length ? about.bullet_points : fallbackBullets;
   const thumbnails = allProjects.filter((project) => project.image).slice(0, 5);
   const testimonial = team[0] || fallbackTeam[0];
+  const text = dictionary[language];
+  const categoryLabels = language === 'sw'
+    ? { all: 'ZOTE', completed: 'ZILIZOKAMILIKA', ongoing: 'ZINAZOENDELEA', daily: 'KILA SIKU' }
+    : { all: 'ALL', completed: 'COMPLETED', ongoing: 'CONTINUES', daily: 'DAILY' };
 
   return <main>
     <section id="home" className="sccl-hero">
       {hero.background_image && <img src={hero.background_image} alt="" className="hero-bg" />}
       <div className="hero-placeholder-bg" />
       <div className="hero-overlay" />
-      <div className="wrap hero-content">
-        <motion.h1 initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>{hero.title || 'G&S CONTRACTORS LTD'}</motion.h1>
-        <motion.p initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .12 }}>{hero.subtitle || hero.description || 'BUILDING QUALITY. DELIVERING EXCELLENCE.'}</motion.p>
+      <div className="wrap hero-center-content">
+        <motion.div className="hero-title-block" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
+          <h1>{hero.title || 'G&S CONTRACTORS LTD'}</h1>
+          <p>{hero.subtitle || hero.description || text.heroSubtitle}</p>
+        </motion.div>
+        <StaggerGroup className="hero-service-strip">{serviceStrip.map((service, index) => <RevealCard onClick={() => { showLoader(text.loadingServices); scrollToSection('services'); }} className="hero-service-box" key={service.en}><span><LineIcon index={index} /></span><b>{service[language]}</b></RevealCard>)}</StaggerGroup>
       </div>
-      <StaggerGroup className="wrap hero-service-strip">{serviceStrip.map((title, index) => <RevealCard className="hero-service-box" key={title}><span><LineIcon index={index} /></span><b>{title}</b></RevealCard>)}</StaggerGroup>
+      <button className="hero-admin-login" onClick={() => setAdminOpen(true)}>{text.login}</button>
     </section>
 
     <section id="about" className="sccl-section bg-white">
       <div className="wrap about-layout">
         <AnimatedSection>
-          <SectionHeader eyebrow="About" title={about.title || 'Welcome To G&S Contractors LTD'} />
+          <SectionHeader eyebrow={text.about} title={about.title || text.aboutTitle} />
           <p className="about-intro">{fallbackAbout}</p>
           <p>{about.description || fallbackAbout}</p>
           <ul className="about-checklist">{bullets.map((point: string) => <li key={point}>{point}</li>)}</ul>
@@ -69,15 +92,15 @@ export default function HomePage() {
 
     <section id="services" className="sccl-section bg-white">
       <div className="wrap">
-        <AnimatedSection><SectionHeader eyebrow="Services" title="Check Our Services" /></AnimatedSection>
-        <StaggerGroup className="services-grid">{services.map((service) => <ServiceCard key={service.id} service={service} onDetails={setDetail} onAdded={(fresh) => setNotice(fresh ? 'Service added to enquiry' : 'Service already in enquiry cart')} />)}</StaggerGroup>
+        <AnimatedSection><SectionHeader eyebrow={text.services} title={text.servicesTitle} /></AnimatedSection>
+        <StaggerGroup className="services-grid">{services.map((service) => <ServiceCard key={service.id} service={service} onDetails={(item) => { showLoader(text.loadingDetails); setDetail(item); }} onAdded={(fresh) => setNotice(fresh ? text.added : text.alreadyAdded)} />)}</StaggerGroup>
       </div>
     </section>
 
     <section id="projects" className="sccl-section projects-section">
       <div className="wrap">
-        <AnimatedSection><SectionHeader eyebrow="Advertisements" title="Check Our Advertisements" text={fallbackPortfolio} /></AnimatedSection>
-        <div className="filter-tabs">{categoryTabs.map((item) => <button key={item.value} onClick={() => setCategory(item.value)} className={category === item.value ? 'is-active' : ''}>{item.label}</button>)}</div>
+        <AnimatedSection><SectionHeader eyebrow={text.advertisements} title={text.advertisementsTitle} text={fallbackPortfolio} /></AnimatedSection>
+        <div className="filter-tabs">{categoryTabs.map((item) => <button key={item.value} onClick={() => { showLoader(text.loadingProjects); setCategory(item.value); }} className={category === item.value ? 'is-active' : ''}>{categoryLabels[item.value as keyof typeof categoryLabels] || item.label}</button>)}</div>
         <motion.div layout className="project-masonry">{projects.map((project) => <ProjectCard key={project.id} project={project} />)}</motion.div>
       </div>
     </section>
@@ -87,7 +110,7 @@ export default function HomePage() {
         <AnimatedSection className="company-logo-panel">{site.logo ? <img src={site.logo} alt={site.company_name || 'Company logo'} /> : <div className="text-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></div>}</AnimatedSection>
         <AnimatedSection>
           <h2>{site.company_name || 'G&S Contractors LTD'}</h2>
-          <p>We are proud on:</p>
+          <p>{text.proud}</p>
           <div className="stats-list">{stats.slice(0, 3).map((stat: any) => <Stat key={stat.id || stat.label} value={Number(stat.value) || 0} suffix={stat.suffix} label={stat.label} />)}</div>
         </AnimatedSection>
       </div>
@@ -102,7 +125,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <ContactSection site={site} notify={setNotice} />
+    <ContactSection site={site} notify={setNotice} language={language} />
     <Footer site={site} openAdmin={() => setAdminOpen(true)} />
     <button className="back-to-top" onClick={() => scrollToSection('home')} aria-label="Back to top">↑</button>
 
@@ -111,6 +134,63 @@ export default function HomePage() {
     {notice && <button onClick={() => setNotice('')} className="notice-toast">{notice}</button>}
   </main>;
 }
+
+const dictionary = {
+  en: {
+    heroSubtitle: 'BUILDING QUALITY. DELIVERING EXCELLENCE.',
+    login: 'Login',
+    about: 'About',
+    aboutTitle: 'Welcome To G&S Contractors LTD',
+    services: 'Services',
+    servicesTitle: 'Check Our Services',
+    advertisements: 'Advertisements',
+    advertisementsTitle: 'Check Our Advertisements',
+    proud: 'We are proud on:',
+    added: 'Service added to enquiry',
+    alreadyAdded: 'Service already in enquiry cart',
+    loadingServices: 'Opening services',
+    loadingDetails: 'Opening service details',
+    loadingProjects: 'Updating projects',
+    contact: 'Contact',
+    contactTitle: 'Contact Us',
+    quoteTitle: 'Need a quotation?',
+    quoteText: 'Select services and submit your enquiry.',
+    quoteOpen: 'Open enquiry form',
+    quoteComplete: 'Complete enquiry',
+    sending: 'Sending...',
+    send: 'Send Message',
+    received: 'Thank you. We have received your message.',
+    enquiryTitle: 'Your enquiry',
+    clear: 'Clear selected services',
+  },
+  sw: {
+    heroSubtitle: 'TUNAJENGA UBORA. TUNAKAMILISHA KWA UMAKINI.',
+    login: 'Ingia',
+    about: 'Kuhusu',
+    aboutTitle: 'Karibu G&S Contractors LTD',
+    services: 'Huduma',
+    servicesTitle: 'Angalia Huduma Zetu',
+    advertisements: 'Matangazo',
+    advertisementsTitle: 'Angalia Matangazo Yetu',
+    proud: 'Tunajivunia:',
+    added: 'Huduma imeongezwa kwenye ombi',
+    alreadyAdded: 'Huduma tayari ipo kwenye ombi',
+    loadingServices: 'Inafungua huduma',
+    loadingDetails: 'Inafungua maelezo ya huduma',
+    loadingProjects: 'Inasasisha miradi',
+    contact: 'Mawasiliano',
+    contactTitle: 'Wasiliana Nasi',
+    quoteTitle: 'Unahitaji makadirio?',
+    quoteText: 'Chagua huduma kisha tuma ombi lako.',
+    quoteOpen: 'Fungua fomu ya ombi',
+    quoteComplete: 'Kamilisha ombi',
+    sending: 'Inatuma...',
+    send: 'Tuma Ujumbe',
+    received: 'Asante. Tumepokea ujumbe wako.',
+    enquiryTitle: 'Ombi lako',
+    clear: 'Futa huduma ulizochagua',
+  },
+};
 
 function Stat({ value, suffix, label }: { value: number; suffix?: string; label: string }) {
   const [display, setDisplay] = useState(0);
@@ -137,10 +217,11 @@ function ServiceDetail({ service, close, notify }: { service: Service; close: ()
   </div>;
 }
 
-function ContactSection({ site, notify }: { site: any; notify: (message: string) => void }) {
+function ContactSection({ site, notify, language }: { site: any; notify: (message: string) => void; language: PublicLanguage }) {
   const { items, totalItems, remove, clear } = useCart();
   const { openEnquiry } = useEnquiryModal();
   const [sending, setSending] = useState(false);
+  const text = dictionary[language];
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSending(true);
@@ -148,7 +229,7 @@ function ContactSection({ site, notify }: { site: any; notify: (message: string)
       const fields = Object.fromEntries(new FormData(event.currentTarget));
       await api('/contact-messages/', { method: 'POST', body: JSON.stringify(fields) });
       event.currentTarget.reset();
-      notify('Thank you. We have received your message.');
+      notify(text.received);
     } catch (error: any) {
       notify(error.message);
     } finally {
@@ -158,14 +239,14 @@ function ContactSection({ site, notify }: { site: any; notify: (message: string)
 
   return <section id="contact" className="sccl-section contact-section">
     <div className="wrap">
-      <AnimatedSection><SectionHeader eyebrow="Contact" title="Contact Us" /></AnimatedSection>
+      <AnimatedSection><SectionHeader eyebrow={text.contact} title={text.contactTitle} /></AnimatedSection>
       <iframe className="contact-map" title="Zanzibar map" src="https://www.google.com/maps?q=Zanzibar,Tanzania&output=embed" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
       <div className="contact-grid">
         <AnimatedSection className="contact-info-list">
           <ContactCard title="Location" value={site.address || site.location || 'Zanzibar, Tanzania'} />
           <ContactCard title="Email" value={site.email || 'info@gscontractorsltd.com'} />
           <ContactCard title="Call" value={[site.primary_phone || '+255 745 113 963', site.secondary_phone || '+255 776 187 485'].filter(Boolean).join(' / ')} />
-          <div id="enquiry" className="enquiry-panel"><b>Need a quotation?</b><p>Select services and submit your enquiry.</p><button type="button" onClick={openEnquiry}>{items.length ? `Complete enquiry - ${totalItems}` : 'Open enquiry form'}</button></div>
+          <div id="enquiry" className="enquiry-panel"><b>{text.quoteTitle}</b><p>{text.quoteText}</p><button type="button" onClick={openEnquiry}>{items.length ? `${text.quoteComplete} - ${totalItems}` : text.quoteOpen}</button></div>
         </AnimatedSection>
         <AnimatedSection>
           <form className="contact-form" onSubmit={submit}>
@@ -173,9 +254,9 @@ function ContactSection({ site, notify }: { site: any; notify: (message: string)
             <input type="email" name="email" placeholder="Your Email" />
             <input name="subject" placeholder="Subject" />
             <textarea name="message" required placeholder="Message" />
-            <button disabled={sending}>{sending ? 'Sending...' : 'Send Message'}</button>
+            <button disabled={sending}>{sending ? text.sending : text.send}</button>
           </form>
-          {items.length > 0 && <div className="selected-services"><b>Your enquiry</b>{items.map((item) => <p key={item.service}>{item.service_title_snapshot}<button type="button" onClick={() => remove(item.service)}>x</button></p>)}<button type="button" onClick={clear}>Clear selected services</button></div>}
+          {items.length > 0 && <div className="selected-services"><b>{text.enquiryTitle}</b>{items.map((item) => <p key={item.service}>{item.service_title_snapshot}<button type="button" onClick={() => remove(item.service)}>x</button></p>)}<button type="button" onClick={clear}>{text.clear}</button></div>}
         </AnimatedSection>
       </div>
     </div>

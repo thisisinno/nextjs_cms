@@ -35,8 +35,24 @@ export function StaggerGroup({ children, className = '' }: { children: ReactNode
   return <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.16 }} variants={stagger} className={className}>{children}</motion.div>;
 }
 
-export function RevealCard({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <motion.div variants={fadeUp} transition={{ duration: 0.55, ease: 'easeOut' }} className={className}>{children}</motion.div>;
+export function RevealCard({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+  const shared = { variants: fadeUp, transition: { duration: 0.55, ease: 'easeOut' as const }, className };
+  if (onClick) return <motion.button type="button" onClick={onClick} {...shared}>{children}</motion.button>;
+  return <motion.div {...shared}>{children}</motion.div>;
+}
+
+export type PublicLanguage = 'en' | 'sw';
+
+export function getPublicLanguage(): PublicLanguage {
+  if (typeof window === 'undefined') return 'en';
+  return localStorage.getItem('sccl-language') === 'sw' ? 'sw' : 'en';
+}
+
+export function setPublicLanguage(language: PublicLanguage) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('sccl-language', language);
+  window.dispatchEvent(new CustomEvent('sccl:language', { detail: language }));
+  window.dispatchEvent(new CustomEvent('sccl:loading', { detail: { label: language === 'sw' ? 'Inabadilisha lugha' : 'Switching language' } }));
 }
 
 export function PublicHeader() {
@@ -44,7 +60,11 @@ export function PublicHeader() {
   const { totalItems, ready } = useCart();
   const { openEnquiry } = useEnquiryModal();
   const [open, setOpen] = useState(false), [active, setActive] = useState('home');
-  const links: [string, string][] = [['Home', 'home'], ['About', 'about'], ['Services', 'services'], ['Advertisement', 'projects'], ['Contact', 'contact']];
+  const [language, setLanguage] = useState<PublicLanguage>('en');
+  const labels = language === 'sw'
+    ? { home: 'Mwanzo', about: 'Kuhusu', services: 'Huduma', projects: 'Matangazo', contact: 'Mawasiliano' }
+    : { home: 'Home', about: 'About', services: 'Services', projects: 'Advertisement', contact: 'Contact' };
+  const links: [string, string][] = [[labels.home, 'home'], [labels.about, 'about'], [labels.services, 'services'], [labels.projects, 'projects'], [labels.contact, 'contact']];
   const go = (id: string) => {
     setOpen(false);
     setActive(id);
@@ -55,6 +75,13 @@ export function PublicHeader() {
     scrollToSection(id);
     if (!document.getElementById(id)) setTimeout(() => scrollToSection(id), 180);
   };
+
+  useEffect(() => {
+    setLanguage(getPublicLanguage());
+    const onLanguage = (event: Event) => setLanguage((event as CustomEvent<PublicLanguage>).detail || getPublicLanguage());
+    window.addEventListener('sccl:language', onLanguage);
+    return () => window.removeEventListener('sccl:language', onLanguage);
+  }, []);
 
   useEffect(() => {
     if (pathname !== '/') return;
@@ -76,13 +103,13 @@ export function PublicHeader() {
         <button onClick={() => go('home')} className="sccl-logo" aria-label="Go to homepage">SCCL<span>.</span></button>
         <nav className="sccl-nav" aria-label="Primary navigation">{links.map(([label, id]) => <button key={id} onClick={() => go(id)} className={active === id ? 'is-active' : ''}>{label}</button>)}</nav>
         <div className="sccl-header-actions">
-          <button className="sccl-language-btn">KISWAHILI</button>
-          <button className="sccl-language-btn">ENGLISH</button>
+          <button onClick={() => setPublicLanguage('sw')} className={`sccl-language-btn ${language === 'sw' ? 'is-active' : ''}`} aria-pressed={language === 'sw'}>KISWAHILI</button>
+          <button onClick={() => setPublicLanguage('en')} className={`sccl-language-btn ${language === 'en' ? 'is-active' : ''}`} aria-pressed={language === 'en'}>ENGLISH</button>
           <button onClick={openEnquiry} className="enquiry-cart-button" aria-label={`Enquiry cart, ${count} selected services`} title="Enquiry cart"><RequestIcon /><AnimatedCount value={count} /></button>
           <button onClick={() => setOpen((value) => !value)} className="sccl-menu-toggle" aria-label="Open navigation">☰</button>
         </div>
       </div>
-      {open && <nav className="wrap sccl-mobile-nav">{links.map(([label, id]) => <button key={id} onClick={() => go(id)} className={active === id ? 'is-active' : ''}>{label}</button>)}<div className="sccl-mobile-languages"><button className="sccl-language-btn">KISWAHILI</button><button className="sccl-language-btn">ENGLISH</button></div></nav>}
+      {open && <nav className="wrap sccl-mobile-nav">{links.map(([label, id]) => <button key={id} onClick={() => go(id)} className={active === id ? 'is-active' : ''}>{label}</button>)}<div className="sccl-mobile-languages"><button onClick={() => setPublicLanguage('sw')} className={`sccl-language-btn ${language === 'sw' ? 'is-active' : ''}`} aria-pressed={language === 'sw'}>KISWAHILI</button><button onClick={() => setPublicLanguage('en')} className={`sccl-language-btn ${language === 'en' ? 'is-active' : ''}`} aria-pressed={language === 'en'}>ENGLISH</button></div></nav>}
     </header>
     {count > 0 && <button onClick={openEnquiry} className="floating-enquiry-cart" aria-label={`View ${count} selected services`}><RequestIcon /><span className="hidden sm:inline">Your enquiry</span><AnimatedCount value={count} /></button>}
   </>;
