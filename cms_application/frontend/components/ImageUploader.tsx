@@ -19,7 +19,7 @@ export function ImageUploader({ label, current, onChange }: Props) {
   }
   return <label className="sm:col-span-2 text-sm font-semibold capitalize">{label.replaceAll('_', ' ')}
     <input className="input mt-1" type="file" accept=".jpg,.jpeg,.png,.webp" onChange={event => select(event.target.files?.[0])} />
-    <span className="mt-1 block text-xs font-normal text-slate-500">JPG, PNG or WebP, up to 3MB. Images are optimized before upload.</span>
+    <span className="mt-1 block text-xs font-normal text-slate-500">JPG, PNG or WebP, up to 5MB. Images are optimized before upload.</span>
     {error && <span className="mt-1 block text-xs font-normal text-red-700">{error}</span>}
     {preview && <img src={preview} className="mt-2 h-24 w-36 rounded object-cover" alt={`Preview of ${label}`} />}
   </label>;

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
-import type { Project, Service } from '@/lib/types';
+import type { AboutBullet, Project, Service } from '@/lib/types';
 import { Loader } from '@/components/Loader';
 import { AnimatedSection, Placeholder, ProjectCard, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
 import { useCart } from '@/components/cart';
@@ -19,7 +19,20 @@ const serviceStrip = [
   { en: 'Architectural Design', sw: 'Usanifu wa Majengo' },
 ];
 const categoryTabs = [{ label: 'ALL', value: 'all' }, { label: 'COMPLETED', value: 'completed' }, { label: 'CONTINUES', value: 'ongoing' }, { label: 'DAILY', value: 'daily' }];
-const fallbackBullets = ['High quality workmanship', 'On-time project delivery', 'Cost effective solutions', 'Safety and integrity always', 'Client satisfaction guaranteed'];
+const fallbackBullets: AboutBullet[] = [
+  { title: 'High quality workmanship', description: 'We use quality materials, skilled teams and careful supervision.' },
+  { title: 'On-time project delivery', description: 'We plan clearly and monitor progress so projects move on schedule.' },
+  { title: 'Cost effective solutions', description: 'We balance strong construction standards with practical budgets.' },
+  { title: 'Safety and integrity always', description: 'We protect people, property and client trust on every project.' },
+  { title: 'Client satisfaction guaranteed', description: 'We communicate clearly and focus on results clients can trust.' },
+];
+const fallbackBulletsSw: AboutBullet[] = [
+  { title: 'Kazi yenye ubora wa juu', description: 'Tunatumia vifaa bora, mafundi wenye ujuzi na usimamizi makini.' },
+  { title: 'Kukamilisha miradi kwa wakati', description: 'Tunapanga vizuri na kufuatilia maendeleo ya kazi kila hatua.' },
+  { title: 'Suluhisho zenye gharama nafuu', description: 'Tunazingatia ubora wa ujenzi pamoja na bajeti halisi ya mteja.' },
+  { title: 'Usalama na uadilifu kila wakati', description: 'Tunalinda watu, mali na uaminifu wa mteja katika kila mradi.' },
+  { title: 'Kuridhika kwa mteja ni kipaumbele', description: 'Tunawasiliana kwa uwazi na kuzingatia matokeo bora kwa mteja.' },
+];
 const fallbackServices: Service[] = ['Luxury Villas', 'Swimming Pools', 'African Style Buildings', 'Renovations', 'Site Management', 'Project Management'].map((title, index) => ({ id: -(index + 1), title, slug: title.toLowerCase().replaceAll(' ', '-'), category: 'Construction', short_description: ['Elegant residential construction with practical site delivery.', 'Durable pool construction, finishing and surrounding works.', 'Locally inspired buildings with modern construction standards.', 'Careful upgrades for homes, offices and commercial spaces.', 'Daily site coordination, quality checks and progress control.', 'Planning, procurement and delivery leadership for your build.'][index], full_description: 'Professional construction support delivered with quality, safety, clear communication and client satisfaction at the center.' }));
 const fallbackProjects: Project[] = ['Luxury Villa Construction', 'Swimming Pool Finishing', 'African Style Building', 'Renovation Works', 'Site Management Daily Update', 'Commercial Project Delivery', 'Interior and Exterior Design', 'Architectural Design'].map((title, index) => ({ id: -(index + 20), title, slug: title.toLowerCase().replaceAll(' ', '-'), category: ['completed', 'ongoing', 'completed', 'daily'][index % 4], description: 'High-quality construction project delivered with precision and attention to detail.', status: ['Completed', 'Continues', 'Completed', 'Daily'][index % 4], location: 'Zanzibar, Tanzania' } as Project));
 const fallbackStats = [{ value: 183, suffix: '', label: 'Happy Clients' }, { value: 2363, suffix: '', label: 'Projects' }, { value: 5, suffix: '', label: 'Years of experience' }];
@@ -48,10 +61,11 @@ export default function HomePage() {
   const hero = data.hero || {}, site = data.site_settings || {}, about = data.about || {};
   const stats = data.stats?.length ? data.stats : fallbackStats;
   const team = data.team?.length ? data.team : fallbackTeam;
-  const bullets = Array.isArray(about.bullet_points) && about.bullet_points.length ? about.bullet_points : fallbackBullets;
-  const swBullets = Array.isArray(about.bullet_points_sw) && about.bullet_points_sw.length ? about.bullet_points_sw : [];
-  const visibleBullets = language === 'sw' && swBullets.length ? swBullets : bullets;
-  const thumbnails = allProjects.filter((project) => project.image).slice(0, 5);
+  const englishBullets = normalizeBullets(about.bullet_points);
+  const kiswahiliBullets = normalizeBullets(about.bullet_points_sw);
+  const visibleBullets = language === 'sw' && kiswahiliBullets.length ? kiswahiliBullets : englishBullets.length ? englishBullets : normalizeBullets(language === 'sw' ? fallbackBulletsSw : fallbackBullets);
+  const aboutDescription = translateCms(about, 'description', language === 'sw' ? 'Sisi ni kampuni ya ujenzi inayoaminika inayotoa suluhisho bora za majengo Zanzibar, Tanzania.' : fallbackAbout);
+  const thumbnails = allProjects.filter((project) => project.image_url || project.image).slice(0, 5);
   const testimonial = team[0] || fallbackTeam[0];
   const categoryLabels = { all: t('all'), completed: t('completed'), ongoing: t('continues'), daily: t('daily') };
 
@@ -74,13 +88,14 @@ export default function HomePage() {
       <div className="wrap about-layout">
         <AnimatedSection>
           <SectionHeader eyebrow={t('about')} title={translateCms(about, 'title', language === 'sw' ? 'Karibu G&S Contractors LTD' : 'Welcome To G&S Contractors LTD')} />
-          <p className="about-intro">{fallbackAbout}</p>
-          <p>{translateCms(about, 'description', fallbackAbout)}</p>
-          <ul className="about-checklist">{visibleBullets.map((point: string) => <li key={point}>{point}</li>)}</ul>
+          <div className="about-copy">
+            {aboutDescription.split(/\n{2,}/).map((paragraph: string) => paragraph.trim()).filter(Boolean).map((paragraph: string, index: number) => <p key={index} className={index === 0 ? 'about-intro' : undefined}>{paragraph}</p>)}
+          </div>
+          <ul className="about-checklist">{visibleBullets.map((point) => <li key={`${point.title}-${point.description}`}><strong>{point.title}</strong>{point.description ? <span>{point.description}</span> : null}</li>)}</ul>
         </AnimatedSection>
-        <AnimatedSection className="about-media">{about.image ? <img src={about.image} alt="Construction project" /> : <Placeholder label="G&S Contractors LTD" kind="about" />}</AnimatedSection>
+        <AnimatedSection className="about-media">{about.image_url || about.image ? <img src={about.image_url || about.image} alt="Construction project" /> : <Placeholder label="G&S Contractors LTD" kind="about" />}</AnimatedSection>
       </div>
-      {thumbnails.length > 0 && <div className="wrap thumbnail-strip">{thumbnails.map((project) => <img src={project.image} alt={project.title} key={project.id} />)}</div>}
+      {thumbnails.length > 0 && <div className="wrap thumbnail-strip">{thumbnails.map((project) => <img src={project.image_url || project.image} alt={project.title} key={project.id} />)}</div>}
     </section>
 
     <section id="services" className="sccl-section bg-white">
@@ -230,4 +245,17 @@ function LineIcon({ index }: { index: number }) {
 
 function initials(name = '') {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'GS';
+}
+
+function normalizeBullets(value: unknown): { title: string; description: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return { title: item, description: '' };
+      return {
+        title: String((item as any)?.title || (item as any)?.text || '').trim(),
+        description: String((item as any)?.description || (item as any)?.short_description || '').trim(),
+      };
+    })
+    .filter((item) => item.title || item.description);
 }

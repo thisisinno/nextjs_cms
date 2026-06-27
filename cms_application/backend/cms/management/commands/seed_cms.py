@@ -42,18 +42,48 @@ class Command(BaseCommand):
                 'description': 'We are a trusted construction company committed to delivering exceptional building solutions across Zanzibar, Tanzania. We specialize in residential, commercial and infrastructure projects with a strong focus on quality, safety and client satisfaction.',
                 'description_sw': 'Sisi ni kampuni ya ujenzi inayoaminika inayotoa suluhisho bora za majengo Zanzibar, Tanzania.',
                 'bullet_points': [
-                    'High quality workmanship',
-                    'On-time project delivery',
-                    'Cost effective solutions',
-                    'Safety and integrity always',
-                    'Client satisfaction guaranteed',
+                    {
+                        'title': 'High quality workmanship',
+                        'description': 'We use quality materials, skilled teams and careful supervision.',
+                    },
+                    {
+                        'title': 'On-time project delivery',
+                        'description': 'We plan clearly and monitor progress so projects move on schedule.',
+                    },
+                    {
+                        'title': 'Cost effective solutions',
+                        'description': 'We balance strong construction standards with practical budgets.',
+                    },
+                    {
+                        'title': 'Safety and integrity always',
+                        'description': 'We protect people, property and client trust on every project.',
+                    },
+                    {
+                        'title': 'Client satisfaction guaranteed',
+                        'description': 'We communicate clearly and focus on results clients can trust.',
+                    },
                 ],
                 'bullet_points_sw': [
-                    'Kazi yenye ubora wa juu',
-                    'Kukamilisha miradi kwa wakati',
-                    'Suluhisho zenye gharama nafuu',
-                    'Usalama na uadilifu kila wakati',
-                    'Kuridhika kwa mteja ni kipaumbele',
+                    {
+                        'title': 'Kazi yenye ubora wa juu',
+                        'description': 'Tunatumia vifaa bora, mafundi wenye ujuzi na usimamizi makini.',
+                    },
+                    {
+                        'title': 'Kukamilisha miradi kwa wakati',
+                        'description': 'Tunapanga vizuri na kufuatilia maendeleo ya kazi kila hatua.',
+                    },
+                    {
+                        'title': 'Suluhisho zenye gharama nafuu',
+                        'description': 'Tunazingatia ubora wa ujenzi pamoja na bajeti halisi ya mteja.',
+                    },
+                    {
+                        'title': 'Usalama na uadilifu kila wakati',
+                        'description': 'Tunalinda watu, mali na uaminifu wa mteja katika kila mradi.',
+                    },
+                    {
+                        'title': 'Kuridhika kwa mteja ni kipaumbele',
+                        'description': 'Tunawasiliana kwa uwazi na kuzingatia matokeo bora kwa mteja.',
+                    },
                 ],
             },
         )

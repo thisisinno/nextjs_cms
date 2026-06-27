@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import *
 
+MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 class FlexibleStringListField(serializers.Field):
     default_error_messages = {
         'invalid': 'Write one bullet point per line.',
@@ -67,32 +69,91 @@ class FlexibleStringListField(serializers.Field):
             if item.strip()
         ]
 
+class FlexibleBulletListField(serializers.Field):
+    default_error_messages = {
+        'invalid': 'Write one bullet per row with an optional short description.',
+    }
+
+    def to_representation(self, value):
+        return self._normalize(value)
+
+    def to_internal_value(self, data):
+        return self._normalize(data)
+
+    def _normalize(self, value):
+        if value in (None, ''):
+            return []
+
+        if isinstance(value, str):
+            import json
+
+            text = value.strip()
+            if not text:
+                return []
+            try:
+                parsed = json.loads(text)
+                return self._normalize(parsed)
+            except Exception:
+                return [{'title': line.strip(), 'description': ''} for line in text.splitlines() if line.strip()]
+
+        if isinstance(value, list):
+            cleaned = []
+            for item in value:
+                if isinstance(item, dict):
+                    title = str(item.get('title') or item.get('text') or '').strip()
+                    description = str(item.get('description') or item.get('short_description') or '').strip()
+                    if title or description:
+                        cleaned.append({'title': title or description[:80], 'description': description})
+                elif item is not None:
+                    title = str(item).strip()
+                    if title:
+                        cleaned.append({'title': title, 'description': ''})
+            return cleaned
+
+        return []
+
+class AbsoluteImageSerializerMixin:
+    def get_image_url(self, obj):
+        image = getattr(obj, 'image', None)
+        if not image:
+            return ''
+        request = self.context.get('request')
+        url = image.url
+        return request.build_absolute_uri(url) if request else url
+
 class ImageValidationMixin:
     def validate_image(self, image):
-        if image and image.size > 3 * 1024 * 1024: raise serializers.ValidationError('Image must be 3MB or smaller.')
+        if image and image.size > MAX_IMAGE_SIZE: raise serializers.ValidationError('Image must be 5MB or smaller.')
+        return image
+    def validate_background_image(self, image):
+        if image and image.size > MAX_IMAGE_SIZE: raise serializers.ValidationError('Image must be 5MB or smaller.')
+        return image
+    def validate_logo(self, image):
+        if image and image.size > MAX_IMAGE_SIZE: raise serializers.ValidationError('Image must be 5MB or smaller.')
+        return image
+    def validate_photo(self, image):
+        if image and image.size > MAX_IMAGE_SIZE: raise serializers.ValidationError('Image must be 5MB or smaller.')
         return image
 class SiteSettingSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=SiteSetting; fields='__all__'
 class HeroSerializer(ImageValidationMixin, serializers.ModelSerializer):
     class Meta: model=HeroSection; fields='__all__'
-class AboutSerializer(ImageValidationMixin, serializers.ModelSerializer):
-    bullet_points = FlexibleStringListField(required=False)
-    bullet_points_sw = FlexibleStringListField(required=False)
-
-    def validate_bullet_points(self, value):
-        return [str(item).strip() for item in value if str(item).strip()]
-
-    def validate_bullet_points_sw(self, value):
-        return [str(item).strip() for item in value if str(item).strip()]
+class AboutSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    bullet_points = FlexibleBulletListField(required=False)
+    bullet_points_sw = FlexibleBulletListField(required=False)
 
     class Meta: model=AboutSection; fields='__all__'
 class InfoCardSerializer(serializers.ModelSerializer):
     class Meta: model=InfoCard; fields='__all__'
-class ServiceSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class ServiceSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
     class Meta: model=Service; fields='__all__'
-class ProjectImageSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class ProjectImageSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
     class Meta: model=ProjectImage; fields='__all__'; read_only_fields=['project']
-class ProjectSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class ProjectSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
     gallery=ProjectImageSerializer(many=True,read_only=True)
     class Meta: model=Project; fields='__all__'
 class StatisticSerializer(serializers.ModelSerializer):

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { api, getAdminToken } from '@/lib/api';
 import { AdminRows } from '@/components/AdminRows';
 import { ImageUploader } from '@/components/ImageUploader';
@@ -44,39 +44,14 @@ function labelFor(field: string) {
   return field.replaceAll('_', ' ');
 }
 
-function normalizeBulletPoints(value: unknown): string {
-  const flatten = (input: unknown): string[] => {
-    if (Array.isArray(input)) {
-      return input.flatMap((item) => flatten(item));
-    }
-
-    if (typeof input === 'string') {
-      const text = input.trim();
-      if (!text) return [];
-
-      try {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) return flatten(parsed);
-      } catch {
-        // Normal string input.
-      }
-
-      return input
-        .split('\n')
-        .flatMap((line) => line.split(','))
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-
-    if (input === null || input === undefined) return [];
-    return [String(input).trim()].filter(Boolean);
-  };
-
-  return JSON.stringify(flatten(value));
-}
-
 function normalizeFieldForSubmit(field: string, value: unknown) {
-  if (field === 'bullet_points' || field === 'bullet_points_sw') return normalizeBulletPoints(value);
+  if (field === 'bullet_points' || field === 'bullet_points_sw') {
+    return JSON.stringify(
+      toBulletRows(value)
+        .map((item) => ({ title: item.title.trim(), description: item.description.trim() }))
+        .filter((item) => item.title || item.description)
+    );
+  }
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (value === null || value === undefined) return '';
   return String(value);
@@ -166,10 +141,18 @@ function Editor({ item, sectionName, config, close, saved }: any) {
     setSuccess('');
     try {
       if (targetField === 'bullet_points_sw') {
-        const translated: string[] = [];
-        for (const item of toBulletRows(sourceValue).filter((row) => row.trim())) {
-          const result: any = await api('/admin/translate/', { method: 'POST', headers: auth, body: JSON.stringify({ text: item, source: 'en', target: 'sw' }) });
-          translated.push(result.translatedText || item);
+        const translated: BulletRow[] = [];
+        for (const item of toBulletRows(sourceValue).filter((row) => row.title || row.description)) {
+          const titleResult: any = item.title
+            ? await api('/admin/translate/', { method: 'POST', headers: auth, body: JSON.stringify({ text: item.title, source: 'en', target: 'sw' }) })
+            : { translatedText: '' };
+          const descResult: any = item.description
+            ? await api('/admin/translate/', { method: 'POST', headers: auth, body: JSON.stringify({ text: item.description, source: 'en', target: 'sw' }) })
+            : { translatedText: '' };
+          translated.push({
+            title: titleResult.translatedText || item.title,
+            description: descResult.translatedText || item.description,
+          });
         }
         setValues((current: any) => ({ ...current, [targetField]: translated }));
       } else {
@@ -240,63 +223,54 @@ function Field({ field, value, set, setFile, onAutoTranslate, translating }: { f
   </label>;
 }
 
-function toBulletRows(value: unknown): string[] {
+type BulletRow = { title: string; description: string };
+
+function toBulletRows(value: unknown): BulletRow[] {
   if (Array.isArray(value)) {
-    const rows = value.flatMap((item) => {
-      if (Array.isArray(item)) return item.map((x) => String(x ?? ''));
-      return [String(item ?? '')];
-    });
-    return rows.length ? rows : [''];
+    const rows = value.map((item) => {
+      if (typeof item === 'string') return { title: item, description: '' };
+      return {
+        title: String((item as any)?.title || (item as any)?.text || '').trim(),
+        description: String((item as any)?.description || (item as any)?.short_description || '').trim(),
+      };
+    }).filter((item) => item.title || item.description);
+
+    return rows.length ? rows : [{ title: '', description: '' }];
   }
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    if (!trimmed) return [''];
+    if (!trimmed) return [{ title: '', description: '' }];
 
     try {
       const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        const rows = parsed.flatMap((item) => {
-          if (Array.isArray(item)) return item.map((x) => String(x ?? ''));
-          return [String(item ?? '')];
-        });
-        return rows.length ? rows : [''];
-      }
+      return toBulletRows(parsed);
     } catch {
       // Not JSON, continue.
     }
 
-    return value.split('\n').length ? value.split('\n') : [value];
+    return trimmed.split('\n').filter(Boolean).map((line) => ({ title: line.trim(), description: '' }));
   }
 
-  return [''];
+  return [{ title: '', description: '' }];
 }
 
-function BulletListEditor({ field = 'bullet_points', value, onChange, onAutoTranslate, translating }: { field?: string; value: unknown; onChange: (items: string[]) => void; onAutoTranslate?: () => void; translating?: boolean }) {
+function BulletListEditor({ field = 'bullet_points', value, onChange, onAutoTranslate, translating }: { field?: string; value: unknown; onChange: (items: BulletRow[]) => void; onAutoTranslate?: () => void; translating?: boolean }) {
   const rows = toBulletRows(value);
 
-  const update = (index: number, next: string) => {
+  const update = (index: number, next: BulletRow) => {
     const copy = [...rows];
     copy[index] = next;
     onChange(copy);
   };
 
   const add = () => {
-    onChange([...rows, '']);
+    onChange([...rows, { title: '', description: '' }]);
   };
 
   const remove = (index: number) => {
     const copy = rows.filter((_, i) => i !== index);
-    onChange(copy.length ? copy : ['']);
-  };
-
-  const keyDown = (event: KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const copy = [...rows];
-      copy.splice(index + 1, 0, '');
-      onChange(copy);
-    }
+    onChange(copy.length ? copy : [{ title: '', description: '' }]);
   };
 
   return <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-sand/60 p-4">
@@ -308,12 +282,13 @@ function BulletListEditor({ field = 'bullet_points', value, onChange, onAutoTran
       <p className="mt-1 text-xs text-slate-600">Write short points. These appear as checklist items on the About section.</p>
     </div>
     <div className="mt-3 space-y-2">
-      {rows.map((item, index) => <div className="flex gap-2" key={index}>
-        <input className="input bg-white" value={item} onChange={(event) => update(index, event.target.value)} onKeyDown={(event) => keyDown(event, index)} placeholder={['Reputation for excellence', 'Partnership with clients', 'Guided by commitment', 'A team of professionals'][index] || 'Another key point'} />
-        <button type="button" className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-lg font-bold text-red-700 shadow-sm disabled:opacity-40" onClick={() => remove(index)} disabled={rows.length === 1 && !item} aria-label="Remove bullet">×</button>
+      {rows.map((item, index) => <div className="rounded-xl border border-slate-200 bg-white p-3" key={index}>
+        <input className="input bg-white" value={item.title} onChange={(event) => update(index, { ...item, title: event.target.value })} placeholder="Bullet title e.g. High quality workmanship" />
+        <textarea className="input mt-2 min-h-20 bg-white" value={item.description} onChange={(event) => update(index, { ...item, description: event.target.value })} placeholder="Short description e.g. We use quality materials and skilled supervision." />
+        <button type="button" className="mt-2 rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-40" onClick={() => remove(index)} disabled={rows.length === 1 && !item.title && !item.description} aria-label="Remove bullet">Remove</button>
       </div>)}
     </div>
-    {rows.every((item) => !item.trim()) && <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">Add key points that appear under About section.</p>}
+    {rows.every((item) => !item.title.trim() && !item.description.trim()) && <p className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">Add key points that appear under About section.</p>}
     <button type="button" className="btn btn-dark mt-3" onClick={add}>+ Add bullet</button>
   </div>;
 }

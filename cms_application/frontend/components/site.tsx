@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { usePathname, useRouter } from 'next/navigation';
-import { ReactNode, useEffect, useState } from 'react';
+import { CSSProperties, ReactNode, useEffect, useState } from 'react';
 import type { Project, Service } from '@/lib/types';
 import { useCart } from './cart';
 import { useEnquiryModal } from './enquiry-modal-context';
@@ -105,26 +105,44 @@ export function ServiceCard({ service, onDetails, onAdded }: { service: Service;
   const { t, translateCms } = useLanguage();
   const active = hasService(service.id);
   const title = translateCms(service, 'title', service.title);
+  const description = translateCms(service, 'short_description', service.short_description);
+  const serviceImage = service.image_url || service.image;
+  const style = serviceImage ? ({ '--service-bg': `url(${serviceImage})` } as CSSProperties) : undefined;
   const addItem = () => {
     add(service);
     onAdded?.(!active);
   };
 
-  return <motion.article variants={fadeUp} whileHover={{ y: -7 }} className="sccl-service-card">
-    <div className="service-icon-block"><ConstructionIcon /></div>
-    <h3>{title}</h3>
-    <p>{translateCms(service, 'short_description', service.short_description)}</p>
-    <div className="service-actions"><button onClick={() => onDetails?.(service)}>{t('details')}</button><EnquiryIconButton active={active} count={countForService(service.id)} label={active ? `${title} is already in your enquiry` : `${t('addToEnquiry')}: ${title}`} onClick={addItem} /></div>
+  return <motion.article variants={fadeUp} whileHover={{ y: -7 }} className={`sccl-service-card image-service-card ${serviceImage ? 'has-image' : 'no-image'}`} style={style}>
+    {serviceImage ? <img className="service-card-bg-img" src={serviceImage} alt="" aria-hidden="true" loading="lazy" /> : null}
+    <div className="service-card-overlay" />
+    <div className="service-card-content">
+      <div className="service-icon-block"><ConstructionIcon /></div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      <div className="service-actions"><button onClick={() => onDetails?.(service)}>{t('details')}</button><EnquiryIconButton active={active} count={countForService(service.id)} label={active ? `${title} is already in your enquiry` : `${t('addToEnquiry')}: ${title}`} onClick={addItem} /></div>
+    </div>
   </motion.article>;
 }
 
 export function ProjectCard({ project }: { project: Project }) {
-  const { translateCms } = useLanguage();
+  const { translateCms, t } = useLanguage();
   const title = translateCms(project, 'title', project.title);
-  return <motion.article layout variants={fadeUp} initial="hidden" animate="visible" className="project-tile">
+  const status = translateCms(project, 'status', project.status);
+  const location = translateCms(project, 'location', project.location);
+  const description = translateCms(project, 'description', project.description);
+  const projectImage = project.image_url || project.image;
+  return <motion.article layout variants={fadeUp} initial="hidden" animate="visible" className={`project-tile image-project-card ${projectImage ? 'has-image' : 'no-image'}`}>
     <div className="project-image">
-      {project.image ? <img src={project.image} alt={title} /> : <Placeholder label={title} />}
-      <div className="project-caption"><p>{project.category}</p><h3>{title}</h3><span>{translateCms(project, 'location', project.location) || translateCms(project, 'status', project.status) || 'Selected project'}</span></div>
+      {projectImage ? <img src={projectImage} alt={title} loading="lazy" /> : <Placeholder label={title || t('selectedProject')} />}
+      <div className="project-image-overlay" />
+      {process.env.NODE_ENV === 'development' && !projectImage ? <span className="project-image-warning">Missing project image</span> : null}
+      <div className="project-caption">
+        <p>{status || project.category}</p>
+        <h3>{title}</h3>
+        {description ? <span className="project-short-desc">{description}</span> : null}
+        <small>{location || t('selectedProject')}</small>
+      </div>
     </div>
   </motion.article>;
 }
