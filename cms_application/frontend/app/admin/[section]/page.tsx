@@ -66,6 +66,21 @@ function friendlyError(message: string) {
   return message;
 }
 
+function getSaveRequest(sectionName: string, endpoint: string, values: any) {
+  const singletonSections = new Set(['settings']);
+  if (singletonSections.has(sectionName)) {
+    return {
+      url: endpoint,
+      method: 'PATCH',
+    };
+  }
+
+  return {
+    url: `${endpoint}${values.id ? `${values.id}/` : ''}`,
+    method: values.id ? 'PATCH' : 'POST',
+  };
+}
+
 export default function Section({ params }: { params: Promise<{ section: string }> }) {
   const [name, setName] = useState('');
   const [rows, setRows] = useState<any[]>([]);
@@ -110,7 +125,7 @@ export default function Section({ params }: { params: Promise<{ section: string 
     <div className="mt-6 overflow-x-auto rounded-xl bg-white">
       <table className="w-full text-left text-sm">
         <thead><tr className="border-b"><th className="p-3">Name / title</th><th className="p-3">Status</th><th className="p-3" /></tr></thead>
-        <tbody>{rows.map((row) => <tr className="border-b" key={row.id || 'setting'}><td className="p-3 font-semibold">{row.title || row.name || row.company_name}</td><td className="p-3">{row.is_active === false ? 'Hidden' : 'Published'}</td><td className="p-3 text-right"><button onClick={() => setEdit(row)}>Edit</button>{row.id && <button className="ml-4 text-red-700" onClick={async () => { if (confirm('Delete this item?')) { await api(`${c.endpoint}${row.id}/`, { method: 'DELETE', headers: auth }); load(); } }}>Delete</button>}</td></tr>)}</tbody>
+        <tbody>{rows.map((row) => <tr className="border-b" key={row.id || 'setting'}><td className="p-3 font-semibold">{name === 'settings' ? row.company_name || 'Site settings' : row.title || row.name || row.company_name}</td><td className="p-3">{row.is_active === false ? 'Hidden' : 'Published'}</td><td className="p-3 text-right"><button onClick={() => setEdit(row)}>Edit</button>{name !== 'settings' && row.id && <button className="ml-4 text-red-700" onClick={async () => { if (confirm('Delete this item?')) { await api(`${c.endpoint}${row.id}/`, { method: 'DELETE', headers: auth }); load(); } }}>Delete</button>}</td></tr>)}</tbody>
       </table>
     </div>
     {edit && <Editor item={edit} sectionName={name} config={c} close={() => setEdit(undefined)} saved={load} />}
@@ -181,7 +196,8 @@ function Editor({ item, sectionName, config, close, saved }: any) {
           fd.append(field, normalizeFieldForSubmit(field, values[field]));
         }
       });
-      await api(`${config.endpoint}${values.id ? `${values.id}/` : ''}`, { method: values.id ? 'PATCH' : 'POST', headers: auth, body: fd });
+      const request = getSaveRequest(sectionName, config.endpoint, values);
+      await api(request.url, { method: request.method, headers: auth, body: fd });
       setSuccess(isAbout ? 'About section updated successfully.' : 'Changes saved successfully.');
       saved();
       setTimeout(close, 350);

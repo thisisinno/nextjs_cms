@@ -143,7 +143,30 @@ class SiteSettingSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, 
     def get_logo_url(self, obj):
         return self.absolute_media_url(getattr(obj, 'logo', None))
 
-    class Meta: model=SiteSetting; fields='__all__'
+    class Meta:
+        model=SiteSetting
+        fields=[
+            'id',
+            'company_name',
+            'logo',
+            'logo_url',
+            'primary_phone',
+            'secondary_phone',
+            'email',
+            'location',
+            'location_sw',
+            'address',
+            'address_sw',
+            'working_days',
+            'working_days_sw',
+            'working_hours',
+            'working_hours_sw',
+            'footer_text',
+            'footer_text_sw',
+            'facebook_url',
+            'instagram_url',
+            'whatsapp_number',
+        ]
 class HeroSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
     background_image_url = serializers.SerializerMethodField()
 

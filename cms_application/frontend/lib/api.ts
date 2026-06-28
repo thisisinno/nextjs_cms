@@ -63,6 +63,14 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!window.location.pathname.includes('/admin/login')) window.location.assign('/admin/login');
   }
   if (!response.ok) {
+    if (typeof body === 'string' && body.toLowerCase().includes('<html')) {
+      console.error('HTML API error response:', { url, status: response.status, body });
+      if (response.status === 404) {
+        throw new Error('API endpoint not found. Please check the admin save URL.');
+      }
+      throw new Error(`Backend returned an HTML error page with status ${response.status}.`);
+    }
+
     const errors = flattenApiErrors(body);
     const message = errors.length > 0 ? errors.map(friendlyApiMessage).join(' ') : `Request failed with status ${response.status}`;
     throw new Error(message);

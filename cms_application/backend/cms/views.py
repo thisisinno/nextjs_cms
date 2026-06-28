@@ -46,7 +46,7 @@ class AdminTeamViewSet(AdminModelViewSet): queryset=TeamMember.objects.all(); se
 class AdminStatsViewSet(AdminModelViewSet): queryset=Statistic.objects.all(); serializer_class=StatisticSerializer
 @api_view(['GET','PUT','PATCH'])
 @permission_classes([permissions.IsAdminUser])
-def admin_settings(request):
+def admin_settings(request, pk=None):
     obj=SiteSetting.objects.first()
     if not obj: obj=SiteSetting.objects.create(primary_phone='',email='',location='')
     serializer=SiteSettingSerializer(obj,data=request.data,partial=request.method=='PATCH',context={'request':request})
