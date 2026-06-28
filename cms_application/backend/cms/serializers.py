@@ -113,13 +113,16 @@ class FlexibleBulletListField(serializers.Field):
         return []
 
 class AbsoluteImageSerializerMixin:
-    def get_image_url(self, obj):
-        image = getattr(obj, 'image', None)
-        if not image:
+    def absolute_media_url(self, value):
+        if not value:
             return ''
         request = self.context.get('request')
-        url = image.url
+        url = value.url
         return request.build_absolute_uri(url) if request else url
+
+    def get_image_url(self, obj):
+        image = getattr(obj, 'image', None)
+        return self.absolute_media_url(image)
 
 class ImageValidationMixin:
     def validate_image(self, image):
@@ -134,9 +137,19 @@ class ImageValidationMixin:
     def validate_photo(self, image):
         if image and image.size > MAX_IMAGE_SIZE: raise serializers.ValidationError('Image must be 5MB or smaller.')
         return image
-class SiteSettingSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class SiteSettingSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    def get_logo_url(self, obj):
+        return self.absolute_media_url(getattr(obj, 'logo', None))
+
     class Meta: model=SiteSetting; fields='__all__'
-class HeroSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class HeroSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    background_image_url = serializers.SerializerMethodField()
+
+    def get_background_image_url(self, obj):
+        return self.absolute_media_url(getattr(obj, 'background_image', None))
+
     class Meta: model=HeroSection; fields='__all__'
 class AboutSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
@@ -158,7 +171,12 @@ class ProjectSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, seri
     class Meta: model=Project; fields='__all__'
 class StatisticSerializer(serializers.ModelSerializer):
     class Meta: model=Statistic; fields='__all__'
-class TeamSerializer(ImageValidationMixin, serializers.ModelSerializer):
+class TeamSerializer(ImageValidationMixin, AbsoluteImageSerializerMixin, serializers.ModelSerializer):
+    photo_url = serializers.SerializerMethodField()
+
+    def get_photo_url(self, obj):
+        return self.absolute_media_url(getattr(obj, 'photo', None))
+
     class Meta: model=TeamMember; fields='__all__'
 class EnquiryItemSerializer(serializers.ModelSerializer):
     service=serializers.PrimaryKeyRelatedField(queryset=Service.objects.all(),required=False,allow_null=True,error_messages={'does_not_exist':'One selected service is no longer available. Please remove it and select again.','incorrect_type':'One selected service is no longer available. Please remove it and select again.'})

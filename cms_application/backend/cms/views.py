@@ -49,9 +49,14 @@ class AdminStatsViewSet(AdminModelViewSet): queryset=Statistic.objects.all(); se
 def admin_settings(request):
     obj=SiteSetting.objects.first()
     if not obj: obj=SiteSetting.objects.create(primary_phone='',email='',location='')
-    serializer=SiteSettingSerializer(obj,data=request.data,partial=request.method=='PATCH')
+    serializer=SiteSettingSerializer(obj,data=request.data,partial=request.method=='PATCH',context={'request':request})
     if request.method=='GET': return Response(SiteSettingSerializer(obj,context={'request':request}).data)
     serializer.is_valid(raise_exception=True); serializer.save(); return Response(serializer.data)
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def site_settings(request):
+    obj=SiteSetting.objects.first()
+    return Response(SiteSettingSerializer(obj,context={'request':request}).data if obj else None)
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def home(request):

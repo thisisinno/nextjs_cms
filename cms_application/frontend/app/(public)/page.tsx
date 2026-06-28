@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import { getAdvertisementImage, resolveMediaUrl } from '@/lib/image';
 import type { AboutBullet, Project, Service } from '@/lib/types';
 import { Loader } from '@/components/Loader';
 import { AnimatedSection, Placeholder, ProjectCard, RevealCard, SectionHeader, ServiceCard, StaggerGroup, scrollToSection } from '@/components/site';
@@ -65,13 +66,15 @@ export default function HomePage() {
   const kiswahiliBullets = normalizeBullets(about.bullet_points_sw);
   const visibleBullets = language === 'sw' && kiswahiliBullets.length ? kiswahiliBullets : englishBullets.length ? englishBullets : normalizeBullets(language === 'sw' ? fallbackBulletsSw : fallbackBullets);
   const aboutDescription = translateCms(about, 'description', language === 'sw' ? 'Sisi ni kampuni ya ujenzi inayoaminika inayotoa suluhisho bora za majengo Zanzibar, Tanzania.' : fallbackAbout);
-  const thumbnails = allProjects.filter((project) => project.image_url || project.image).slice(0, 5);
-  const testimonial = team[0] || fallbackTeam[0];
+  const thumbnails = allProjects.slice(0, 5);
   const categoryLabels = { all: t('all'), completed: t('completed'), ongoing: t('continues'), daily: t('daily') };
+  const heroBackground = resolveMediaUrl(hero.background_image_url || hero.background_image);
+  const aboutImage = resolveMediaUrl(about.image_url || about.image);
+  const siteLogo = resolveMediaUrl(site.logo_url || site.logo);
 
   return <main>
     <section id="home" className="sccl-hero">
-      {hero.background_image && <img src={hero.background_image} alt="" className="hero-bg" />}
+      {heroBackground && <img src={heroBackground} alt="" className="hero-bg" />}
       <div className="hero-placeholder-bg" />
       <div className="hero-overlay" />
       <div className="wrap hero-center-content">
@@ -93,9 +96,9 @@ export default function HomePage() {
           </div>
           <ul className="about-checklist">{visibleBullets.map((point) => <li key={`${point.title}-${point.description}`}><strong>{point.title}</strong>{point.description ? <span>{point.description}</span> : null}</li>)}</ul>
         </AnimatedSection>
-        <AnimatedSection className="about-media">{about.image_url || about.image ? <img src={about.image_url || about.image} alt="Construction project" /> : <Placeholder label="G&S Contractors LTD" kind="about" />}</AnimatedSection>
+        <AnimatedSection className="about-media">{aboutImage ? <img src={aboutImage} alt="Construction project" /> : <Placeholder label="G&S Contractors LTD" kind="about" />}</AnimatedSection>
       </div>
-      {thumbnails.length > 0 && <div className="wrap thumbnail-strip">{thumbnails.map((project) => <img src={project.image_url || project.image} alt={project.title} key={project.id} />)}</div>}
+      {thumbnails.length > 0 && <div className="wrap thumbnail-strip">{thumbnails.map((project) => <img src={getAdvertisementImage(project)} alt={project.title} key={project.id} />)}</div>}
     </section>
 
     <section id="services" className="sccl-section bg-white">
@@ -115,7 +118,7 @@ export default function HomePage() {
 
     <section className="stats-company-section">
       <div className="wrap stats-company-grid">
-        <AnimatedSection className="company-logo-panel">{site.logo ? <img src={site.logo} alt={site.company_name || 'Company logo'} /> : <div className="text-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></div>}</AnimatedSection>
+        <AnimatedSection className="company-logo-panel">{siteLogo ? <img src={siteLogo} alt={site.company_name || 'Company logo'} /> : <div className="text-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></div>}</AnimatedSection>
         <AnimatedSection>
           <h2>{site.company_name || 'G&S Contractors LTD'}</h2>
           <p>{t('weAreProudOn')}</p>
@@ -124,14 +127,7 @@ export default function HomePage() {
       </div>
     </section>
 
-    <section className="testimonial-band">
-      <div className="wrap testimonial-inner">
-        <div className="testimonial-photo">{testimonial.photo ? <img src={testimonial.photo} alt={testimonial.name} /> : <span>{initials(testimonial.name)}</span>}</div>
-        <h3>{testimonial.name || 'Adam Abdalla Said (Natepe)'}</h3>
-        <p className="role">{translateCms(testimonial, 'position', 'Manager SCCL.')}</p>
-        <blockquote>{translateCms(testimonial, 'message', 'We are going to make SCCL the best Construction Company throughout.')}</blockquote>
-      </div>
-    </section>
+    <TeamSlider team={team} />
 
     <ContactSection site={site} notify={setNotice} />
     <Footer site={site} openAdmin={() => setAdminOpen(true)} />
@@ -155,6 +151,54 @@ function Stat({ value, suffix, label }: { value: number; suffix?: string; label:
     return () => window.clearInterval(timer);
   }, [value]);
   return <div className="stat-counter"><strong>{display}{suffix}</strong><span>{label}</span></div>;
+}
+
+function TeamSlider({ team }: { team: any[] }) {
+  const members = team.length ? team : fallbackTeam;
+  const [index, setIndex] = useState(0);
+  const [manualTick, setManualTick] = useState(0);
+  const { translateCms } = useLanguage();
+  const current = members[index] || members[0] || fallbackTeam[0];
+  const photoUrl = resolveMediaUrl(current.photo_url || current.photo);
+  const multiple = members.length > 1;
+
+  useEffect(() => {
+    if (!multiple) return;
+    const timer = window.setInterval(() => {
+      setIndex((value) => (value + 1) % members.length);
+    }, 6500);
+    return () => window.clearInterval(timer);
+  }, [members.length, multiple, manualTick]);
+
+  useEffect(() => {
+    if (index >= members.length) setIndex(0);
+  }, [index, members.length]);
+
+  const go = (nextIndex: number) => {
+    setIndex((nextIndex + members.length) % members.length);
+    setManualTick((value) => value + 1);
+  };
+
+  return <section className="testimonial-band" id="team">
+    <div className="wrap testimonial-inner team-slider">
+      <div className="team-slide-counter">{index + 1}/{members.length}</div>
+      <AnimatePresence mode="wait">
+        <motion.div key={current.id || current.name || index} className="team-slide" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: .35 }}>
+          <div className="testimonial-photo">{photoUrl ? <img src={photoUrl} alt={current.name} /> : <span>{initials(current.name)}</span>}</div>
+          <h3>{current.name || 'Adam Abdalla Said (Natepe)'}</h3>
+          <p className="role">{translateCms(current, 'position', 'Manager SCCL.')}</p>
+          <blockquote>{translateCms(current, 'message', 'We are going to make SCCL the best Construction Company throughout.')}</blockquote>
+        </motion.div>
+      </AnimatePresence>
+      {multiple && <div className="team-slider-controls">
+        <button type="button" onClick={() => go(index - 1)} aria-label="Previous team member">‹</button>
+        <button type="button" onClick={() => go(index + 1)} aria-label="Next team member">›</button>
+      </div>}
+      <div className="team-slider-dots" aria-label="Team members">
+        {members.map((member, dotIndex) => <button key={member.id || member.name || dotIndex} type="button" className={dotIndex === index ? 'is-active' : ''} onClick={() => go(dotIndex)} aria-label={`Show team member ${dotIndex + 1}`} />)}
+      </div>
+    </div>
+  </section>;
 }
 
 function ServiceDetail({ service, close, notify }: { service: Service; close: () => void; notify: (message: string) => void }) {
@@ -222,9 +266,10 @@ function ContactCard({ title, value }: { title: string; value: string }) {
 
 function Footer({ site, openAdmin }: { site: any; openAdmin: () => void }) {
   const { t, translateCms } = useLanguage();
+  const logoUrl = resolveMediaUrl(site.logo_url || site.logo);
   return <footer className="footer-dark">
     <div className="wrap footer-grid">
-      <div><p className="footer-logo">{site.company_name || 'G&S Contractors LTD'}<span>.</span></p><p>{translateCms(site, 'address', translateCms(site, 'location', 'Zanzibar, Tanzania'))}</p><p>{site.primary_phone || '+255 745 113 963'}</p><p>{site.email || 'info@gscontractorsltd.com'}</p><div className="social-row">{site.facebook_url && <a href={site.facebook_url}>f</a>}{site.instagram_url && <a href={site.instagram_url}>ig</a>}{site.whatsapp_number && <a href={`https://wa.me/${String(site.whatsapp_number).replace(/\D/g, '')}`}>wa</a>}</div></div>
+      <div><div className="footer-logo-square">{logoUrl ? <img src={logoUrl} alt={site.company_name || 'Company logo'} /> : <span>{initials(site.company_name || 'G&S Contractors LTD')}</span>}</div><p>{translateCms(site, 'address', translateCms(site, 'location', 'Zanzibar, Tanzania'))}</p><p>{site.primary_phone || '+255 745 113 963'}</p><p>{site.email || 'info@gscontractorsltd.com'}</p><div className="social-row">{site.facebook_url && <a href={site.facebook_url}>f</a>}{site.instagram_url && <a href={site.instagram_url}>ig</a>}{site.whatsapp_number && <a href={`https://wa.me/${String(site.whatsapp_number).replace(/\D/g, '')}`}>wa</a>}</div></div>
       <div><h3>{t('workingDays')}</h3><p>{translateCms(site, 'working_days', 'Monday - Saturday')}</p></div>
       <div><h3>{t('servicesTime')}</h3><p>{translateCms(site, 'working_hours', '08:00 - 17:00')}</p></div>
       <div><h3>{t('company')}</h3><p>{translateCms(site, 'footer_text', 'Welcome to G&S Contractors LTD. Building quality and delivering excellence across Zanzibar, Tanzania.')}</p><button onClick={openAdmin}>Admin login</button></div>

@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import { usePathname, useRouter } from 'next/navigation';
 import { CSSProperties, ReactNode, useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { DEFAULT_CONSTRUCTION_IMAGE, getAdvertisementImage, getServiceImage, resolveMediaUrl } from '@/lib/image';
 import type { Project, Service } from '@/lib/types';
 import { useCart } from './cart';
 import { useEnquiryModal } from './enquiry-modal-context';
@@ -47,8 +49,10 @@ export function PublicHeader() {
   const { totalItems, ready } = useCart();
   const { openEnquiry } = useEnquiryModal();
   const [open, setOpen] = useState(false), [active, setActive] = useState('home');
+  const [site, setSite] = useState<any>();
   const { language, setLanguage, t } = useLanguage();
   const links = [[t('home'), 'home'], [t('about'), 'about'], [t('services'), 'services'], [t('advertisement'), 'projects'], [t('contact'), 'contact']] as const;
+  const logoUrl = resolveMediaUrl(site?.logo_url || site?.logo);
   const go = (id: string) => {
     setOpen(false);
     setActive(id);
@@ -73,11 +77,17 @@ export function PublicHeader() {
     return () => observer.disconnect();
   }, [pathname]);
 
+  useEffect(() => {
+    api<any>('/site-settings/').then(setSite).catch(() => setSite(undefined));
+  }, []);
+
   const count = ready ? totalItems : 0;
   return <>
     <header className="sccl-header">
       <div className="wrap sccl-header-inner">
-        <button onClick={() => go('home')} className="sccl-logo" aria-label="Go to homepage">SCCL<span>.</span></button>
+        <button onClick={() => go('home')} className={`sccl-logo ${logoUrl ? 'has-image' : ''}`} aria-label="Go to homepage">
+          {logoUrl ? <img className="sccl-header-logo-img" src={logoUrl} alt={site?.company_name || 'Company logo'} /> : <>SCCL<span>.</span></>}
+        </button>
         <nav className="sccl-nav" aria-label="Primary navigation">{links.map(([label, id]) => <button key={id} onClick={() => go(id)} className={active === id ? 'is-active' : ''}>{label}</button>)}</nav>
         <div className="sccl-header-actions">
           <button onClick={() => setLanguage('sw')} className={`sccl-language-btn ${language === 'sw' ? 'is-active' : ''}`} aria-pressed={language === 'sw'}>KISWAHILI</button>
@@ -106,7 +116,7 @@ export function ServiceCard({ service, onDetails, onAdded }: { service: Service;
   const active = hasService(service.id);
   const title = translateCms(service, 'title', service.title);
   const description = translateCms(service, 'short_description', service.short_description);
-  const serviceImage = service.image_url || service.image;
+  const serviceImage = getServiceImage(service);
   const style = serviceImage ? ({ '--service-bg': `url(${serviceImage})` } as CSSProperties) : undefined;
   const addItem = () => {
     add(service);
@@ -131,10 +141,13 @@ export function ProjectCard({ project }: { project: Project }) {
   const status = translateCms(project, 'status', project.status);
   const location = translateCms(project, 'location', project.location);
   const description = translateCms(project, 'description', project.description);
-  const projectImage = project.image_url || project.image;
+  const [projectImage, setProjectImage] = useState(() => getAdvertisementImage(project));
+  useEffect(() => {
+    setProjectImage(getAdvertisementImage(project));
+  }, [project.id, project.image_url, project.image, project.image_external_url, project.title, project.category]);
   return <motion.article layout variants={fadeUp} initial="hidden" animate="visible" className={`project-tile image-project-card ${projectImage ? 'has-image' : 'no-image'}`}>
     <div className="project-image">
-      {projectImage ? <img src={projectImage} alt={title} loading="lazy" /> : <Placeholder label={title || t('selectedProject')} />}
+      {projectImage ? <img src={projectImage} alt={title} loading="lazy" onError={() => setProjectImage((current) => current === DEFAULT_CONSTRUCTION_IMAGE ? '' : DEFAULT_CONSTRUCTION_IMAGE)} /> : <Placeholder label={title || t('selectedProject')} />}
       <div className="project-image-overlay" />
       {process.env.NODE_ENV === 'development' && !projectImage ? <span className="project-image-warning">Missing project image</span> : null}
       <div className="project-caption">

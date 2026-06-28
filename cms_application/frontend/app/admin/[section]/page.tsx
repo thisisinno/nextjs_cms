@@ -2,13 +2,14 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { api, getAdminToken } from '@/lib/api';
+import { resolveMediaUrl } from '@/lib/image';
 import { AdminRows } from '@/components/AdminRows';
 import { ImageUploader } from '@/components/ImageUploader';
 import { Loader } from '@/components/Loader';
 
 const config: Record<string, { endpoint: string; title: string; fields: string[] }> = {
-  services: { endpoint: '/admin/services/', title: 'Services', fields: ['title', 'title_sw', 'slug', 'category', 'category_sw', 'short_description', 'short_description_sw', 'full_description', 'full_description_sw', 'image', 'icon', 'display_order', 'is_active'] },
-  projects: { endpoint: '/admin/projects/', title: 'Projects', fields: ['title', 'title_sw', 'slug', 'category', 'description', 'description_sw', 'image', 'status', 'status_sw', 'location', 'location_sw', 'start_date', 'end_date', 'is_featured', 'display_order', 'is_active'] },
+  services: { endpoint: '/admin/services/', title: 'Services', fields: ['title', 'title_sw', 'slug', 'category', 'category_sw', 'short_description', 'short_description_sw', 'full_description', 'full_description_sw', 'image', 'image_external_url', 'icon', 'display_order', 'is_active'] },
+  projects: { endpoint: '/admin/projects/', title: 'Projects', fields: ['title', 'title_sw', 'slug', 'category', 'description', 'description_sw', 'image', 'image_external_url', 'status', 'status_sw', 'location', 'location_sw', 'start_date', 'end_date', 'is_featured', 'display_order', 'is_active'] },
   home: { endpoint: '/admin/hero/', title: 'Hero content', fields: ['title', 'title_sw', 'subtitle', 'subtitle_sw', 'description', 'description_sw', 'background_image', 'primary_button_text', 'primary_button_link', 'secondary_button_text', 'secondary_button_link', 'is_active'] },
   about: { endpoint: '/admin/about/', title: 'About content', fields: ['title', 'title_sw', 'description', 'description_sw', 'image', 'bullet_points', 'bullet_points_sw', 'is_active'] },
   info: { endpoint: '/admin/info-cards/', title: 'Vision, mission and focus', fields: ['type', 'title', 'description', 'icon', 'display_order', 'is_active'] },
@@ -123,13 +124,12 @@ function Status({ rows, messages, reload }: { rows: any[]; messages: boolean; re
 
 function Editor({ item, sectionName, config, close, saved }: any) {
   const [values, setValues] = useState<any>(item);
-  const [file, setFile] = useState<File>();
+  const [filesByField, setFilesByField] = useState<Record<string, File>>({});
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const [translating, setTranslating] = useState('');
   const auth = { Authorization: `Bearer ${getAdminToken()}` };
-  const image = config.fields.find((x: string) => fieldTypes[x] === 'image');
   const isAbout = sectionName === 'about';
 
   async function autoTranslate(targetField: string) {
@@ -174,9 +174,10 @@ function Editor({ item, sectionName, config, close, saved }: any) {
     try {
       const fd = new FormData();
       config.fields.forEach((field: string) => {
-        if (field === image && file) {
-          fd.append(field, file);
-        } else if (field !== image) {
+        if (fieldTypes[field] === 'image') {
+          const selectedFile = filesByField[field];
+          if (selectedFile) fd.append(field, selectedFile);
+        } else {
           fd.append(field, normalizeFieldForSubmit(field, values[field]));
         }
       });
@@ -200,7 +201,12 @@ function Editor({ item, sectionName, config, close, saved }: any) {
         </div>
         <button type="button" onClick={close}>✕</button>
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">{config.fields.map((field: string) => <Field key={field} field={field} value={values[field]} set={setValues} setFile={setFile} onAutoTranslate={field.endsWith('_sw') && config.fields.includes(field.slice(0, -3)) ? () => autoTranslate(field) : undefined} translating={translating === field} />)}</div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">{config.fields.map((field: string) => <Field key={field} field={field} value={values[field]} values={values} set={setValues} setFile={(file?: File) => setFilesByField((current) => {
+        const next = { ...current };
+        if (file) next[field] = file;
+        else delete next[field];
+        return next;
+      })} onAutoTranslate={field.endsWith('_sw') && config.fields.includes(field.slice(0, -3)) ? () => autoTranslate(field) : undefined} translating={translating === field} />)}</div>
       {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
       {success && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{success}</p>}
       <div className="mt-6 flex gap-3"><button className="btn btn-gold" disabled={saving}>{saving ? 'Saving changes…' : 'Save changes'}</button><button type="button" className="btn" onClick={close}>Cancel</button></div>
@@ -208,11 +214,14 @@ function Editor({ item, sectionName, config, close, saved }: any) {
   </div>;
 }
 
-function Field({ field, value, set, setFile, onAutoTranslate, translating }: { field: string; value: any; set: any; setFile: any; onAutoTranslate?: () => void; translating?: boolean }) {
+function Field({ field, value, values, set, setFile, onAutoTranslate, translating }: { field: string; value: any; values?: any; set: any; setFile: any; onAutoTranslate?: () => void; translating?: boolean }) {
   const type = fieldTypes[field] || 'text';
   const long = type === 'textarea' || type === 'bullet-list';
   const change = (e: ChangeEvent<any>) => set((v: any) => ({ ...v, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
-  if (type === 'image') return <ImageUploader label={field} current={typeof value === 'string' ? value : undefined} onChange={setFile} />;
+  if (type === 'image') {
+    const current = resolveMediaUrl(values?.[`${field}_url`] || (field === 'logo' ? values?.logo_url : '') || (typeof value === 'string' ? value : undefined));
+    return <ImageUploader label={field} current={current} onChange={setFile} />;
+  }
   if (type === 'boolean') return <label className="flex items-center gap-2 pt-7 capitalize"><input type="checkbox" checked={!!value} onChange={change} />{labelFor(field)}</label>;
   if (type === 'bullet-list') return <BulletListEditor field={field} value={value} onChange={(items) => set((v: any) => ({ ...v, [field]: items }))} onAutoTranslate={onAutoTranslate} translating={translating} />;
   if (field === 'category') return <label className="text-sm font-semibold">Category<select className="input mt-1" value={value || ''} onChange={change}><option value="">Select category</option>{['completed', 'ongoing', 'daily', 'featured'].map((x) => <option key={x}>{x}</option>)}</select></label>;
